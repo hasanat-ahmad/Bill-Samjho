@@ -1,0 +1,26 @@
+{
+  "_comment": "VERIFY: all rates and the slab method against the latest NEPRA notification before release. Rates are from 2026 news reports. Live values come from Firebase Remote Config key 'tariff_config'.",
+  "version": "2026-10",
+  "source_url": "https://nepra.org.pk",
+  "protected_limit_units": 200,
+  "protected_months": 6,
+  "near_limit_units": 180,
+  "slabs": {
+    "protected": [
+      {"from": 1, "to": 100, "rate": 10.54},
+      {"from": 101, "to": 200, "rate": 13.01}
+    ],
+    "non_protected": [
+      {"from": 1, "to": 100, "rate": 22.44},
+      {"from": 101, "to": 200, "rate": 28.91},
+      {"from": 201, "to": 300, "rate": 33.10},
+      {"from": 301, "to": 400, "rate": 37.99},
+      {"from": 401, "to": 500, "rate": 40.22},
+      {"from": 501, "to": 600, "rate": 41.62},
+      {"from": 601, "to": 700, "rate": 42.76},
+      {"from": 701, "to": null, "rate": 47.69}
+    ]
+  },
+  "non_protected_flat_above_units": 200,
+  "energy_tolerance_percent": 3
+}
