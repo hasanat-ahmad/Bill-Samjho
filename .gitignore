@@ -1,0 +1,8 @@
+functions/node_modules/
+functions/lib/
+functions/.env
+.firebase/
+*.log
+.DS_Store
+# Firebase app config (contains project identifiers)
+app/android/app/google-services.json
