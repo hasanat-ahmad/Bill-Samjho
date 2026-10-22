@@ -1,25 +1,45 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_ce/hive_ce.dart';
 
 import 'models/bill.dart';
 import 'models/connection.dart';
 
-/// On-device storage (Hive boxes `connections`, `bills`, `settings`).
+/// On-device storage (Hive boxes `connections`, `bills`, `settings`),
+/// AES-256 encrypted with a key kept in the Android Keystore (NFR-07).
 /// Records are stored as JSON strings, so no generated adapters are needed.
 class LocalStore {
+  static const _boxNames = ['connections', 'bills', 'settings'];
+
   late Box<String> _connections;
   late Box<String> _bills;
   late Box<dynamic> _settings;
 
   /// Call after `Hive.initFlutter()` (app) or `Hive.init(path)` (tests).
-  /// [inMemory] keeps boxes off disk, for widget tests.
-  Future<void> open({bool inMemory = false}) async {
+  /// [encryptionKey] is 32 bytes; [inMemory] keeps boxes off disk for tests.
+  Future<void> open({List<int>? encryptionKey, bool inMemory = false}) async {
+    final cipher = encryptionKey == null ? null : HiveAesCipher(encryptionKey);
+    try {
+      await _openBoxes(cipher, inMemory);
+    } catch (e) {
+      // Unreadable data (e.g. key lost after a factory reset of the keystore):
+      // start fresh rather than crash.
+      debugPrint('Local data unreadable, resetting: ${e.runtimeType}');
+      await Hive.close();
+      for (final name in _boxNames) {
+        await Hive.deleteBoxFromDisk(name);
+      }
+      await _openBoxes(cipher, inMemory);
+    }
+  }
+
+  Future<void> _openBoxes(HiveCipher? cipher, bool inMemory) async {
     final bytes = inMemory ? Uint8List(0) : null;
-    _connections = await Hive.openBox<String>('connections', bytes: bytes);
-    _bills = await Hive.openBox<String>('bills', bytes: bytes);
-    _settings = await Hive.openBox<dynamic>('settings', bytes: bytes);
+    _connections = await Hive.openBox<String>('connections', encryptionCipher: cipher, bytes: bytes);
+    _bills = await Hive.openBox<String>('bills', encryptionCipher: cipher, bytes: bytes);
+    _settings = await Hive.openBox<dynamic>('settings', encryptionCipher: cipher, bytes: bytes);
   }
 
   // ---- Connections ----
@@ -64,10 +84,12 @@ class LocalStore {
 
   Future<void> setSetting(String key, Object value) => _settings.put(key, value);
 
-  /// Deletes connections and bills; keeps device ID and onboarding flag.
+  /// Deletes connections and bills; keeps device ID and preferences.
   Future<void> clearData() async {
     await _connections.clear();
     await _bills.clear();
+    await _connections.compact();
+    await _bills.compact();
   }
 
   static Map<String, dynamic> _decode(String s) => jsonDecode(s) as Map<String, dynamic>;
@@ -77,7 +99,22 @@ class LocalStore {
 class SettingKeys {
   static const deviceId = 'device_id';
   static const onboardingDone = 'onboarding_done';
+  static const language = 'language';
   static const slowVoice = 'slow_voice';
   static const largeText = 'large_text';
   static const ttsTipShown = 'tts_tip_shown';
+}
+
+/// The Hive encryption key, generated once and kept in the Android Keystore.
+class StorageKey {
+  static const _name = 'bill_samjho_hive_key_v1';
+  static const _storage = FlutterSecureStorage();
+
+  static Future<List<int>> load() async {
+    final existing = await _storage.read(key: _name);
+    if (existing != null) return base64Url.decode(existing);
+    final key = Hive.generateSecureKey();
+    await _storage.write(key: _name, value: base64UrlEncode(key));
+    return key;
+  }
 }
