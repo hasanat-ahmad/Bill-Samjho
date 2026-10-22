@@ -27,6 +27,9 @@
     "units": "units",
     "units_legend": "Units",
     "amount": "Rs {amount}",
+    "credit_bill": "This is a credit bill: you have nothing to pay this month.",
+    "credit_due": "Credit — nothing to pay",
+    "amount_credit": "Rs {amount} credit",
     "units_of_limit": "{units} / {limit} units",
     "glossary": "Bill terms",
     "settings": "Settings",
@@ -77,11 +80,13 @@
     "complain": "Make a complaint",
     "advice_only": "This is advice only. Always compare with your paper bill.",
     "tts_tip": "To hear explanations, install Google Speech Services.",
+    "voice_failed": "Couldn't play the voice on this phone. Install or update Google Speech Services.",
     "install": "Install",
     "not_found": "Bill not found",
 
     "complaint_title": "Complaint message",
     "complaint_hint": "You can edit this message before sending it.",
+    "complaint_escalate": "If your company does not fix it, you can complain to NEPRA on nepra.org.pk or in the NEPRA Asaan Approach app.",
     "copy": "Copy",
     "share": "Share",
     "call": "Call 118",
@@ -116,6 +121,7 @@
   "templates": {
     "summary": "This month you used {units} units of electricity. Your bill is Rs {total}, due by {due_date}.",
     "summary_no_due_date": "This month you used {units} units of electricity. Your bill is Rs {total}.",
+    "summary_credit": "This month you used {units} units of electricity. You have a credit of Rs {credit}, so there is nothing to pay.",
     "verdict_normal": "Your bill looks normal.",
     "verdict_check": "A few things on your bill are worth checking.",
     "verdict_wrong": "Your bill may be wrong. Compare it with your paper bill first.",
@@ -150,9 +156,10 @@
     {"code": "FPA", "icon": "fuel", "title": "Fuel Price Adjustment", "meaning": "A monthly charge when the price of fuel used to make electricity changes. It applies to everyone in the country, and is sometimes negative."},
     {"code": "QTR", "icon": "calendar", "title": "Quarterly Adjustment", "meaning": "Every three months the government raises or lowers electricity rates. That change appears on this line."},
     {"code": "GST", "icon": "tax", "title": "General Sales Tax", "meaning": "Federal government tax on the cost of electricity."},
-    {"code": "ED", "icon": "tax", "title": "Electricity Duty", "meaning": "Provincial government tax on the cost of electricity."},
-    {"code": "Fixed", "icon": "fixed", "title": "Fixed Charges", "meaning": "An amount charged every month, no matter how much electricity you use."},
+    {"code": "ED", "icon": "tax", "title": "Electricity Duty", "meaning": "A provincial tax. It was removed from electricity bills from July 2025, so newer bills should not have it."},
+    {"code": "Fixed", "icon": "fixed", "title": "Fixed Charges", "meaning": "Since February 2026, a monthly charge for each kilowatt (kW) of your sanctioned load, even if you use little electricity. Lifeline homes do not pay it."},
     {"code": "Arrears", "icon": "history", "title": "Arrears", "meaning": "Unpaid amount from earlier bills. If you already paid, show your receipt to get it removed."},
-    {"code": "L.P. Surcharge", "icon": "late", "title": "Late Payment Surcharge", "meaning": "A penalty added if you pay after the due date. Pay on time to avoid it."}
+    {"code": "L.P. Surcharge", "icon": "late", "title": "Late Payment Surcharge", "meaning": "A penalty added if you pay after the due date. Pay on time to avoid it."},
+    {"code": "PTV Fee", "icon": "tv", "title": "TV Fee", "meaning": "The Rs 35 PTV fee was removed from electricity bills in July 2025. If a new bill still shows it, ask your electricity company."}
   ]
 }
