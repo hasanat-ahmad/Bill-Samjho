@@ -64,7 +64,8 @@ export function validateExtraction(raw: unknown): ValidationResult {
   const totalDue = toNumber(r.total_due);
   if (units === null || totalDue === null) return { ok: false, error: "unreadable" };
   if (units < 0 || units > MAX_UNITS) return { ok: false, error: "unreadable" };
-  if (totalDue < 0 || totalDue > MAX_AMOUNT) return { ok: false, error: "unreadable" };
+  // Negative = credit bill ("CR"), e.g. after overpayment or solar net metering.
+  if (Math.abs(totalDue) > MAX_AMOUNT) return { ok: false, error: "unreadable" };
   const billMonth = toStr(r.bill_month);
   if (billMonth === null || !MONTH.test(billMonth)) return { ok: false, error: "unreadable" };
 

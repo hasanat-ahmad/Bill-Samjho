@@ -24,7 +24,10 @@ const MAX_BODY_BYTES = MAX_IMAGE_BYTES + 16 * 1024;
 const DAILY_LIMIT_PER_DEVICE = 30;
 /** Generous because many Pakistani mobile users share one carrier IP (CGNAT). */
 const DAILY_LIMIT_PER_IP = 300;
-const GEMINI_TIMEOUT_MS = 20_000;
+/** Total time for all model attempts; stays under the app's 20 s timeout. */
+const GEMINI_BUDGET_MS = 18_000;
+/** Errors worth retrying on the next model: overload, rate limit, server error. */
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Upload = { image?: Buffer; deviceId?: string; tooLarge: boolean };
@@ -96,6 +99,42 @@ async function allowRequest(deviceId: string, ip: string): Promise<boolean> {
   });
 }
 
+/**
+ * Asks Gemini to read the bill, trying each model in turn while time remains.
+ * Returns the JSON text, or undefined if every attempt failed.
+ */
+async function readBill(models: string[], image: Buffer): Promise<string | undefined> {
+  const deadline = Date.now() + GEMINI_BUDGET_MS;
+  const data = image.toString("base64");
+  for (const model of models) {
+    const remaining = deadline - Date.now();
+    if (remaining < 2_000) break;
+    try {
+      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.value(), httpOptions: { timeout: remaining } });
+      const response = await ai.models.generateContent({
+        model,
+        contents: [{
+          role: "user",
+          parts: [{ inlineData: { mimeType: "image/jpeg", data } }, { text: "Read this bill." }],
+        }],
+        config: {
+          systemInstruction: SYSTEM_PROMPT,
+          temperature: 0,
+          responseMimeType: "application/json",
+          responseSchema: BILL_SCHEMA,
+        },
+      });
+      return response.text;
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : undefined;
+      // Log only the model and status, never the image or the response.
+      logger.warn("Gemini call failed", { model, status: status ?? "timeout_or_network" });
+      if (status !== undefined && !RETRYABLE_STATUS.has(status)) return undefined;
+    }
+  }
+  return undefined;
+}
+
 /** POST /extractBill: bill photo → validated ExtractedBill JSON (SDA §9). */
 export const extractBill = onRequest(
   {
@@ -133,37 +172,15 @@ export const extractBill = onRequest(
 
     if (!(await allowRequest(upload.deviceId, req.ip ?? "unknown"))) return fail(429, "rate_limited");
 
-    const model = process.env.GEMINI_MODEL;
-    if (!model) {
+    // Comma-separated, best first; the next is tried when one is overloaded.
+    const models = (process.env.GEMINI_MODEL ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+    if (models.length === 0) {
       logger.error("GEMINI_MODEL is not set");
       return fail(503, "ai_busy");
     }
 
-    let text: string | undefined;
-    try {
-      const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.value(), httpOptions: { timeout: GEMINI_TIMEOUT_MS } });
-      const response = await ai.models.generateContent({
-        model,
-        contents: [{
-          role: "user",
-          parts: [
-            { inlineData: { mimeType: "image/jpeg", data: upload.image.toString("base64") } },
-            { text: "Read this bill." },
-          ],
-        }],
-        config: {
-          systemInstruction: SYSTEM_PROMPT,
-          temperature: 0,
-          responseMimeType: "application/json",
-          responseSchema: BILL_SCHEMA,
-        },
-      });
-      text = response.text;
-    } catch (e) {
-      // Log only the status, never the image or the response.
-      logger.warn("Gemini call failed", { status: e instanceof ApiError ? e.status : "unknown" });
-      return fail(503, "ai_busy");
-    }
+    const text = await readBill(models, upload.image);
+    if (text === undefined) return fail(503, "ai_busy");
 
     let parsed: unknown;
     try {

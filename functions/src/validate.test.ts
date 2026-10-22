@@ -71,8 +71,14 @@ test("missing or malformed bill month is unreadable", () => {
   assert.deepEqual(validateExtraction({ ...good, bill_month: "2026-13" }), { ok: false, error: "unreadable" });
 });
 
+test("credit bill (negative total) is accepted", () => {
+  const r = validateExtraction({ ...good, total_due: -297 });
+  assert.ok(r.ok);
+  assert.equal(r.bill.total_due, -297);
+});
+
 test("total out of range is unreadable", () => {
-  assert.equal(validateExtraction({ ...good, total_due: -5 }).ok, false);
+  assert.equal(validateExtraction({ ...good, total_due: -1e9 }).ok, false);
   assert.equal(validateExtraction({ ...good, total_due: 1e9 }).ok, false);
   assert.equal(validateExtraction({ ...good, total_due: Number.NaN }).ok, false);
 });
