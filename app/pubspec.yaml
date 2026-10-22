@@ -30,6 +30,9 @@ dependencies:
   share_plus: ^13.3.1
   url_launcher: ^6.3.3
   uuid: ^4.6.0
+  flutter_secure_storage: ^11.2.0
+  firebase_app_check: ^0.5.0
+  package_info_plus: ^10.2.2
 
 dev_dependencies:
   flutter_test:
@@ -41,7 +44,7 @@ flutter:
 
   assets:
     - assets/tariff_config_default.json
-    - assets/urdu_strings.json
+    - assets/i18n/
 
   fonts:
     - family: NotoNastaliqUrdu
