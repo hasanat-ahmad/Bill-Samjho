@@ -8,7 +8,7 @@ import '../core/constants.dart';
 import 'models/extracted_bill.dart';
 
 /// Error codes match the backend (SDA §9.1) and the `errors` keys in
-/// assets/urdu_strings.json.
+/// assets/i18n/*.json.
 enum ApiError {
   offline('offline'),
   timeout('timeout'),
@@ -17,6 +17,7 @@ enum ApiError {
   tooLarge('too_large'),
   rateLimited('rate_limited'),
   aiBusy('ai_busy'),
+  unavailable('unavailable'),
   unknown('unknown');
 
   const ApiError(this.code);
@@ -27,6 +28,9 @@ enum ApiError {
 
   /// Errors fixed by taking a new photo rather than retrying the same one.
   bool get needsNewPhoto => this == notABill || this == unreadable || this == tooLarge;
+
+  /// Errors where retrying the same photo can help.
+  bool get canRetry => this == offline || this == timeout || this == aiBusy || this == unknown;
 }
 
 class ApiException implements Exception {
@@ -37,32 +41,48 @@ class ApiException implements Exception {
   String toString() => 'ApiException(${error.code})';
 }
 
-abstract class ApiService {
-  /// Sends a JPEG and returns the bill data read from it.
-  /// Throws [ApiException].
-  Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId);
+/// Upload progress from 0 to 1.
+typedef ProgressCallback = void Function(double sent);
 
-  factory ApiService.create() =>
-      Env.useMockApi ? MockApiService() : HttpApiService(Env.extractUrl);
+abstract class ApiService {
+  /// Sends a JPEG and returns the validated bill data read from it.
+  /// Throws [ApiException].
+  Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId, {ProgressCallback? onProgress});
+
+  bool get isMock => false;
+
+  /// [appCheckToken] attests the request comes from the genuine app.
+  factory ApiService.create({Future<String?> Function()? appCheckToken}) {
+    if (Env.useMockApi) return MockApiService();
+    final uri = Uri.tryParse(Env.extractUrl);
+    // HTTPS only: bill photos must never travel in clear text.
+    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return UnavailableApiService();
+    return HttpApiService(uri, appCheckToken: appCheckToken);
+  }
 }
 
 class HttpApiService implements ApiService {
-  HttpApiService(String url, {Dio? dio, Connectivity? connectivity})
-      : _url = url,
-        _connectivity = connectivity ?? Connectivity(),
+  HttpApiService(this._uri, {Dio? dio, Connectivity? connectivity, this.appCheckToken})
+      : _connectivity = connectivity ?? Connectivity(),
         _dio = dio ??
             Dio(BaseOptions(
               connectTimeout: AppConstants.requestTimeout,
               sendTimeout: AppConstants.requestTimeout,
               receiveTimeout: AppConstants.requestTimeout,
+              followRedirects: false,
+              responseType: ResponseType.json,
             ));
 
-  final String _url;
+  final Uri _uri;
   final Dio _dio;
   final Connectivity _connectivity;
+  final Future<String?> Function()? appCheckToken;
 
   @override
-  Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId) async {
+  bool get isMock => false;
+
+  @override
+  Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId, {ProgressCallback? onProgress}) async {
     final network = await _connectivity.checkConnectivity();
     if (network.every((n) => n == ConnectivityResult.none)) {
       throw const ApiException(ApiError.offline);
@@ -72,24 +92,44 @@ class HttpApiService implements ApiService {
       'deviceId': deviceId,
       'image': MultipartFile.fromBytes(jpeg, filename: 'bill.jpg', contentType: DioMediaType('image', 'jpeg')),
     });
+    final token = await _safeToken();
 
     try {
       final res = await _dio
-          .post<Map<String, dynamic>>(_url, data: form)
+          .postUri<Object>(
+            _uri,
+            data: form,
+            options: Options(headers: {'X-Firebase-AppCheck': ?token}),
+            onSendProgress: onProgress == null || form.length <= 0
+                ? null
+                : (sent, total) => onProgress(total > 0 ? sent / total : 0),
+          )
           .timeout(AppConstants.requestTimeout);
-      final bill = ExtractedBill.fromJson(res.data!);
+      final body = res.data;
+      if (body is! Map<String, dynamic>) throw const ApiException(ApiError.unknown);
+      final bill = ExtractedBill.fromUntrusted(body);
       if (bill.confidence < AppConstants.minConfidence) {
         throw const ApiException(ApiError.unreadable);
       }
       return bill;
     } on ApiException {
       rethrow;
+    } on FormatException {
+      throw const ApiException(ApiError.unreadable);
     } on DioException catch (e) {
       throw ApiException(_mapDioError(e));
     } on TimeoutException {
       throw const ApiException(ApiError.timeout);
     } catch (_) {
       throw const ApiException(ApiError.unknown);
+    }
+  }
+
+  Future<String?> _safeToken() async {
+    try {
+      return await appCheckToken?.call().timeout(const Duration(seconds: 5));
+    } catch (_) {
+      return null; // The backend decides whether a missing token is allowed.
     }
   }
 
@@ -103,8 +143,8 @@ class HttpApiService implements ApiService {
         return ApiError.offline;
       case DioExceptionType.badResponse:
         final data = e.response?.data;
-        final code = data is Map ? data['error'] as String? : null;
-        if (code != null) return ApiError.fromCode(code);
+        final code = data is Map ? data['error'] : null;
+        if (code is String) return ApiError.fromCode(code);
         return switch (e.response?.statusCode) {
           413 => ApiError.tooLarge,
           429 => ApiError.rateLimited,
@@ -117,13 +157,31 @@ class HttpApiService implements ApiService {
   }
 }
 
+/// Used when a release build has no valid HTTPS backend URL.
+class UnavailableApiService implements ApiService {
+  @override
+  bool get isMock => false;
+
+  @override
+  Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId, {ProgressCallback? onProgress}) =>
+      Future.error(const ApiException(ApiError.unavailable));
+}
+
 /// Returns a sample LESCO bill after a short delay, for development
-/// without the backend (`--dart-define=USE_MOCK_API=true`).
+/// without the backend (`--dart-define=USE_MOCK_API=true`). The app shows a
+/// "demo mode" banner whenever this is active.
 class MockApiService implements ApiService {
   @override
-  Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId) async {
-    await Future<void>.delayed(const Duration(seconds: 2));
-    return ExtractedBill.fromJson(sampleBillJson);
+  bool get isMock => true;
+
+  @override
+  Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId, {ProgressCallback? onProgress}) async {
+    for (var i = 1; i <= 5; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      onProgress?.call(i / 5);
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    return ExtractedBill.fromUntrusted(sampleBillJson);
   }
 
   static const sampleBillJson = <String, dynamic>{
