@@ -50,6 +50,25 @@ flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build
 
 A release build never falls back to demo data: without a valid `https://` `EXTRACT_URL` scanning shows "not available" (unless `--dart-define=USE_MOCK_API=true` is passed explicitly, which shows the demo banner). A plain `flutter build apk` makes a universal APK (~54 MB); the per-architecture APKs stay under the 25 MB limit (NFR-06).
 
+## Test with real bills locally (no cloud project needed)
+
+Runs the real backend and Gemini on this Mac, using the Firebase emulator with an offline `demo-` project.
+
+```sh
+# 1. Local secrets (both files are git-ignored)
+printf 'GEMINI_API_KEY=<your key>\nRATE_LIMIT_SECRET=%s\n' "$(openssl rand -hex 32)" > functions/.secret.local
+printf 'GEMINI_MODEL=gemini-3.5-flash,gemini-3.5-flash-lite,gemini-flash-latest\nREQUIRE_APP_CHECK=false\n' > functions/.env.local
+
+# 2. Backend
+cd functions && npm install && npm run build && cd ..
+firebase emulators:start --only functions,firestore --project demo-bill-samjho
+
+# 3. App on the Android emulator (debug builds may use plain HTTP to 10.0.2.2 only)
+cd app && flutter run --dart-define=EXTRACT_URL=http://10.0.2.2:5001/demo-bill-samjho/asia-south1/extractBill
+```
+
+Gemini models are tried in order: if one is overloaded (503) or slow, the next is used within an 18-second budget. On 2026-10-22, `gemini-2.5-flash` was no longer available to new keys and `gemini-3.5-flash` / `gemini-3.5-flash-lite` read test bills correctly in 4–11 s.
+
 ## Firebase setup
 
 The app works without Firebase: it uses the bundled tariff config, no crash reporting and no App Check. To connect it:
@@ -94,7 +113,7 @@ cd functions && npm install && npm test && npm audit
 
 ## Before release: VERIFY / TODO
 
-- [ ] **Tariff rates and slab method** in `tariff_config_default.json` against the latest NEPRA notification, including the "all units at one slab rate above 200" rule for non-protected consumers.
+- [x] Tariff rates checked against NEPRA decision TRF-100 / S.R.O. 279(I)/2026 (12 Feb 2026). **Re-check after every new NEPRA notification** and update Remote Config. The energy check accepts both the official and the older non-protected method, and is skipped for bills older than `effective_from`.
 - [ ] **Gemini model name** in `functions/.env` (`GEMINI_MODEL`).
 - [ ] **Urdu text review** by a native speaker: `app/assets/i18n/ur.json`.
 - [ ] Release signing config in `app/android/app/build.gradle.kts` (currently debug keys).
