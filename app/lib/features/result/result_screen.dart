@@ -173,9 +173,12 @@ class _AmountCard extends StatelessWidget {
     final theme = Theme.of(context);
     return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(s.t('amount_due'), style: theme.textTheme.bodySmall),
+        Text(s.t(bill.data.isCredit ? 'credit_due' : 'amount_due'), style: theme.textTheme.bodySmall),
         const SizedBox(height: Gap.xs),
-        Text(formatAmount(bill.data.totalDue, s), style: numberStyle(40, weight: FontWeight.w800)),
+        Text(
+          formatAmount(bill.data.totalDue, s),
+          style: numberStyle(40, weight: FontWeight.w800, color: bill.data.isCredit ? AppColors.greenInk : AppColors.ink),
+        ),
         const SizedBox(height: Gap.md),
         Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
           _Chip(icon: Icons.calendar_month_rounded, text: formatMonth(bill.data.billMonth, s)),

@@ -89,7 +89,8 @@ class ExtractedBill {
     final total = _double(json['total_due']);
     final month = _str(json['bill_month']);
     if (units == null || units < 0 || units > maxUnits) throw const FormatException('units');
-    if (total == null || !total.isFinite || total < 0 || total > maxAmount) throw const FormatException('total_due');
+    // Negative = credit bill ("CR"): nothing to pay.
+    if (total == null || !total.isFinite || total.abs() > maxAmount) throw const FormatException('total_due');
     if (month == null || monthIndex(month) == null) throw const FormatException('bill_month');
 
     double? amount(String key) {
@@ -169,6 +170,9 @@ class ExtractedBill {
         'history': history.map((e) => e.toJson()).toList(),
         'confidence': confidence,
       };
+
+  /// A credit bill: the company owes the consumer, nothing to pay.
+  bool get isCredit => totalDue < 0;
 
   /// Used by the confirm screen when the user corrects units or total.
   ExtractedBill copyWith({int? units, double? totalDue}) => ExtractedBill(

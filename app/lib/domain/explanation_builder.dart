@@ -30,6 +30,10 @@ class ExplanationBuilder {
   String findingText(Finding f) {
     final values = _format(f.params);
     if (f.isSummary) {
+      final total = num.tryParse(f.params['total'] ?? '') ?? 0;
+      if (total < 0) {
+        return s.template('summary_credit', {...values, 'credit': formatNumber(total.abs())});
+      }
       return s.template(values.containsKey('due_date') ? 'summary' : 'summary_no_due_date', values);
     }
     var text = s.template(_templateFor[f.ruleId] ?? f.ruleId, values);

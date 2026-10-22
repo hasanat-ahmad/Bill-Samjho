@@ -7,8 +7,10 @@ final _number = NumberFormat('#,##0', 'en_US');
 /// Western digits with thousands separators in both languages, e.g. 2,450 (NFR-02).
 String formatNumber(num n) => _number.format(n.round());
 
-/// "Rs 2,450" / "2,450 روپے".
-String formatAmount(num n, AppStrings s) => s.t('amount', {'amount': formatNumber(n)});
+/// "Rs 2,450" / "2,450 روپے"; a credit (negative) shows as "Rs 297 credit".
+String formatAmount(num n, AppStrings s) => n < 0
+    ? s.t('amount_credit', {'amount': formatNumber(n.abs())})
+    : s.t('amount', {'amount': formatNumber(n)});
 
 final _monthPattern = RegExp(r'^(\d{4})-(\d{1,2})$');
 final _datePattern = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$');

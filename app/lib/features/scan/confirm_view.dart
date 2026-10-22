@@ -24,7 +24,8 @@ class ConfirmView extends StatefulWidget {
 
 class _ConfirmViewState extends State<ConfirmView> {
   late final _units = TextEditingController(text: '${widget.data.units}');
-  late final _total = TextEditingController(text: _plain(widget.data.totalDue));
+  // Credit bills are edited as a positive amount and stored as negative.
+  late final _total = TextEditingController(text: _plain(widget.data.totalDue.abs()));
   final _form = GlobalKey<FormState>();
 
   static String _plain(double v) => v == v.roundToDouble() ? '${v.round()}' : v.toStringAsFixed(2);
@@ -39,7 +40,11 @@ class _ConfirmViewState extends State<ConfirmView> {
   void _submit() {
     FocusScope.of(context).unfocus();
     if (!_form.currentState!.validate()) return;
-    context.read<ScanCubit>().confirm(units: int.parse(_units.text), totalDue: double.parse(_total.text));
+    final total = double.parse(_total.text);
+    context.read<ScanCubit>().confirm(
+          units: int.parse(_units.text),
+          totalDue: widget.data.isCredit ? -total : total,
+        );
   }
 
   @override
@@ -98,6 +103,14 @@ class _ConfirmViewState extends State<ConfirmView> {
                 return n == null || n < 0 || n > ExtractedBill.maxAmount ? s.t('invalid_number') : null;
               },
             ),
+            if (data.isCredit) ...[
+              const SizedBox(height: Gap.sm),
+              Row(children: [
+                const Icon(Icons.savings_rounded, color: AppColors.green, size: 22),
+                const SizedBox(width: Gap.sm),
+                Expanded(child: Text(s.t('credit_bill'), style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.greenInk))),
+              ]),
+            ],
             if (data.dueDate != null) ...[
               const SizedBox(height: Gap.md),
               _InfoTile(icon: Icons.event_rounded, label: s.t('due_date'), value: formatDate(data.dueDate!, s)),
