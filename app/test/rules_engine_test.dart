@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:bill_samjho/core/i18n.dart';
 import 'package:bill_samjho/data/models/bill.dart';
 import 'package:bill_samjho/data/models/extracted_bill.dart';
 import 'package:bill_samjho/data/models/finding.dart';
 import 'package:bill_samjho/data/models/tariff_config.dart';
-import 'package:bill_samjho/data/models/urdu_strings.dart';
 import 'package:bill_samjho/domain/explanation_builder.dart';
 import 'package:bill_samjho/domain/rules_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,8 +14,9 @@ Map<String, dynamic> _asset(String name) =>
     jsonDecode(File('assets/$name').readAsStringSync()) as Map<String, dynamic>;
 
 final config = TariffConfig.fromJson(_asset('tariff_config_default.json'));
-final strings = UrduStrings(_asset('urdu_strings.json'));
-final engine = RulesEngine(config, strings);
+final engine = RulesEngine(config);
+final en = ExplanationBuilder(AppStrings(AppLanguage.en, _asset('i18n/en.json')));
+final ur = ExplanationBuilder(AppStrings(AppLanguage.ur, _asset('i18n/ur.json')));
 
 ExtractedBill bill({
   String month = '2026-09',
@@ -94,8 +95,9 @@ void main() {
       final f = finding(bill(units: 150, energy: 2500), 'R1');
       expect(f.severity, Severity.wrong);
       // Closest candidate is non-protected 3,689.50
-      expect(f.urduText, contains('3,690'));
-      expect(f.urduText, contains('2,500'));
+      expect(f.params, {'expected': '3690', 'printed': '2500'});
+      expect(en.findingText(f), contains('Rs 3,690'));
+      expect(ur.findingText(f), contains('3,690 روپے'));
     });
 
     test('passes within tolerance of protected', () {
@@ -121,7 +123,7 @@ void main() {
     test('check when > 1.4 × average', () {
       final f = finding(bill(units: 150, history: flatHistory(100)), 'R2');
       expect(f.severity, Severity.check);
-      expect(f.urduText, contains('100'));
+      expect(f.params['avg'], '100');
     });
 
     test('wrong when > 2 × average', () {
@@ -175,12 +177,14 @@ void main() {
     test('fires when this month > 200, return month 6 months later', () {
       final f = finding(bill(units: 201), 'R4');
       expect(f.severity, Severity.check);
-      expect(f.urduText, contains('مارچ 2027'));
+      expect(f.params['return_month'], '2027-03');
+      expect(en.findingText(f), contains('March 2027'));
+      expect(ur.findingText(f), contains('مارچ 2027'));
     });
 
     test('fires when a month in last 6 > 200', () {
       final history = [HistoryEntry(month: '2026-05', units: 210)];
-      expect(finding(bill(units: 150, history: history), 'R4').urduText, contains('نومبر 2026'));
+      expect(finding(bill(units: 150, history: history), 'R4').params['return_month'], '2026-11');
     });
 
     test('does not fire at exactly 200 or for months older than 6', () {
@@ -192,7 +196,7 @@ void main() {
 
   group('R5 near limit', () {
     test('fires from 180 to 200 inclusive', () {
-      expect(finding(bill(units: 180), 'R5').urduText, contains('20'));
+      expect(finding(bill(units: 180), 'R5').params, {'limit': '200', 'left': '20'});
       expect(finding(bill(units: 200), 'R5').severity, Severity.info);
     });
 
@@ -206,7 +210,8 @@ void main() {
     test('fires when arrears > 0', () {
       final f = finding(bill(arrears: 1250), 'R6');
       expect(f.severity, Severity.check);
-      expect(f.urduText, contains('1,250'));
+      expect(f.params['arrears'], '1250');
+      expect(en.findingText(f), contains('Rs 1,250'));
     });
 
     test('does not fire for zero or missing arrears', () {
@@ -246,8 +251,9 @@ void main() {
     test('summary first, then wrong → check → info', () {
       final result = engine.evaluate(bill(units: 190, energy: 9999, arrears: 100, fpa: 10), const []);
       expect(result.findings.map((f) => f.ruleId), ['summary', 'R1', 'R6', 'R5', 'R7']);
-      expect(result.findings.first.urduText, contains('190'));
-      expect(result.findings.first.urduText, contains('15 اکتوبر 2026'));
+      expect(en.findingText(result.findings.first), contains('used 190 units'));
+      expect(en.findingText(result.findings.first), contains('15 October 2026'));
+      expect(ur.findingText(result.findings.first), contains('15 اکتوبر 2026'));
     });
   });
 
@@ -274,19 +280,40 @@ void main() {
       expect(b.totalDue, 7500);
       final result = engine.evaluate(b, [saved('2026-08', 100)]);
       expect(result.findings.map((f) => f.ruleId), ['summary', 'R4']);
-      expect(result.findings.first.urduText, isNot(contains('{')));
+      for (final f in result.findings) {
+        expect(en.findingText(f), isNot(contains('{')));
+        expect(ur.findingText(f), isNot(contains('{')));
+      }
     });
   });
 
   group('ExplanationBuilder', () {
-    final builder = ExplanationBuilder(strings);
-
-    test('verdict sentence, summary, then findings', () {
+    test('verdict sentence, summary, then findings, in both languages', () {
       final result = engine.evaluate(bill(units: 190, arrears: 100, fpa: 10), const []);
-      final text = builder.build(result.verdict, result.findings);
-      expect(text, startsWith(strings.fill('verdict_check')));
-      expect(text.indexOf('190'), lessThan(text.indexOf('بقایا')));
-      expect(text, isNot(contains('{')));
+      final english = en.build(result.verdict, result.findings);
+      expect(english, startsWith('A few things on your bill are worth checking.'));
+      expect(english.indexOf('190'), lessThan(english.indexOf('unpaid amount')));
+      final urdu = ur.build(result.verdict, result.findings);
+      expect(urdu, startsWith(ur.verdictSentence(Verdict.check)));
+      expect(urdu.indexOf('190'), lessThan(urdu.indexOf('بقایا')));
+      expect('$english $urdu', isNot(contains('{')));
+    });
+
+    test('every rule renders a full sentence in both languages', () {
+      final all = engine.evaluate(
+        bill(units: 250, energy: 99999, arrears: 100, fpa: 10, previousReading: 5, presentReading: 5, history: flatHistory(100)),
+        const [],
+      );
+      expect(all.findings.map((f) => f.ruleId).toSet(), containsAll(['summary', 'R1', 'R2', 'R3', 'R4', 'R6', 'R7']));
+      final near = engine.evaluate(bill(units: 190), const []).findings;
+      for (final f in [...all.findings, ...near]) {
+        for (final b in [en, ur]) {
+          final text = b.findingText(f);
+          expect(text, isNot(contains('{')), reason: '${f.ruleId} ${b.s.language}');
+          expect(text, isNot(startsWith('r')), reason: 'template key leaked for ${f.ruleId}');
+          expect(text.length, greaterThan(20));
+        }
+      }
     });
 
     test('complaint uses reference, month, units and worst finding', () {
@@ -298,7 +325,7 @@ void main() {
         referenceNo: '12 34567 1234567',
       );
       final result = engine.evaluate(data, const []);
-      final text = builder.complaint(Bill(
+      final saved = Bill(
         id: '1',
         connectionId: 'c1',
         data: data,
@@ -306,11 +333,14 @@ void main() {
         findings: result.findings,
         imagePath: '',
         createdAt: DateTime(2026),
-      ));
-      expect(text, contains('12 34567 1234567'));
-      expect(text, contains('ستمبر 2026'));
-      expect(text, contains('2,500'));
-      expect(text, isNot(contains('{')));
+      );
+      final english = en.complaint(saved);
+      expect(english, contains('12 34567 1234567'));
+      expect(english, contains('September 2026'));
+      expect(english, contains('Rs 2,500'));
+      final urdu = ur.complaint(saved);
+      expect(urdu, contains('ستمبر 2026'));
+      expect('$english $urdu', isNot(contains('{')));
     });
   });
 }
