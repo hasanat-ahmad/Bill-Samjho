@@ -10,7 +10,7 @@ const DATE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 /** Control and bidi-override characters that could disguise text. */
 const UNSAFE_CHARS = /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g;
 const STRING_LIMITS: Record<string, number> = {
-  disco: 24, reference_no: 40, bill_month: 7, tariff_category: 24, due_date: 10,
+  disco: 24, reference_no: 40, bill_month: 7, tariff_category: 24, due_date: 10, reading_date: 10,
 };
 
 export type ExtractError = "not_a_bill" | "unreadable";
@@ -23,7 +23,7 @@ const NUMBER_FIELDS = [
   "energy_charges", "fixed_charges", "fpa", "qtr_adjustment", "gst", "income_tax",
   "electricity_duty", "tv_fee", "arrears", "late_surcharge",
 ] as const;
-const STRING_FIELDS = ["disco", "reference_no", "bill_month", "tariff_category", "due_date"] as const;
+const STRING_FIELDS = ["disco", "reference_no", "bill_month", "tariff_category", "due_date", "reading_date"] as const;
 
 function toNumber(v: unknown): number | null {
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
@@ -98,6 +98,7 @@ export function validateExtraction(raw: unknown): ValidationResult {
   bill.bill_month = billMonth;
   bill.protected_consumer = typeof r.protected_consumer === "boolean" ? r.protected_consumer : null;
   if (typeof bill.due_date === "string" && !DATE.test(bill.due_date)) bill.due_date = null;
+  if (typeof bill.reading_date === "string" && !DATE.test(bill.reading_date)) bill.reading_date = null;
 
   const history = Array.isArray(r.history) ? r.history : [];
   bill.history = history.flatMap((h) => {

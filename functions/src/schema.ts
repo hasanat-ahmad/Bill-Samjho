@@ -53,6 +53,7 @@ export const BILL_SCHEMA: Schema = {
     total_due: num("Amount payable within due date"),
     late_surcharge: num("Extra amount if paid after due date"),
     due_date: str("YYYY-MM-DD"),
+    reading_date: str("Date the meter was read for this bill, YYYY-MM-DD"),
     history: {
       type: Type.ARRAY,
       items: {
