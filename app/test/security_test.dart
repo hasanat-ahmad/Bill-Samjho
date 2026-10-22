@@ -27,7 +27,7 @@ void main() {
         {'units': -1},
         {'units': 5001},
         {'total_due': null},
-        {'total_due': -1},
+        {'total_due': -1e12},
         {'total_due': 1e12},
         {'total_due': double.nan},
         {'bill_month': null},
@@ -69,6 +69,12 @@ void main() {
       expect(b.history.every((h) => h.month == '2025-01'), isTrue);
     });
 
+    test('credit bill (negative total) is accepted', () {
+      final b = ExtractedBill.fromUntrusted(_bill({'total_due': -297}));
+      expect(b.totalDue, -297);
+      expect(b.isCredit, isTrue);
+    });
+
     test('history that is not a list is ignored', () {
       expect(ExtractedBill.fromUntrusted(_bill({'history': 'oops'})).history, isEmpty);
     });
@@ -98,6 +104,14 @@ void main() {
   });
 
   group('API client', () {
+    test('backend must be HTTPS; plain HTTP only to the local emulator in debug', () {
+      expect(isAllowedBackend(Uri.parse('https://x.cloudfunctions.net/extractBill'), release: true), isTrue);
+      expect(isAllowedBackend(Uri.parse('http://x.cloudfunctions.net/extractBill'), release: true), isFalse);
+      expect(isAllowedBackend(Uri.parse('http://10.0.2.2:5001/p/r/extractBill'), release: true), isFalse);
+      expect(isAllowedBackend(Uri.parse('http://10.0.2.2:5001/p/r/extractBill'), release: false), isTrue);
+      expect(isAllowedBackend(Uri.parse('http://192.168.1.5:5001/x'), release: false), isFalse);
+    });
+
     test('mock is never used silently: it reports itself as demo', () {
       expect(MockApiService().isMock, isTrue);
       expect(UnavailableApiService().isMock, isFalse);

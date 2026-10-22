@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../core/constants.dart';
 import 'models/extracted_bill.dart';
@@ -55,10 +55,19 @@ abstract class ApiService {
   factory ApiService.create({Future<String?> Function()? appCheckToken}) {
     if (Env.useMockApi) return MockApiService();
     final uri = Uri.tryParse(Env.extractUrl);
-    // HTTPS only: bill photos must never travel in clear text.
-    if (uri == null || uri.scheme != 'https' || uri.host.isEmpty) return UnavailableApiService();
+    if (uri == null || uri.host.isEmpty || !isAllowedBackend(uri, release: kReleaseMode)) {
+      return UnavailableApiService();
+    }
     return HttpApiService(uri, appCheckToken: appCheckToken);
   }
+}
+
+/// HTTPS only, so bill photos never travel in clear text. Debug builds may
+/// also use plain HTTP to the local Firebase emulator on this machine.
+bool isAllowedBackend(Uri uri, {required bool release}) {
+  if (uri.scheme == 'https') return true;
+  const localHosts = {'10.0.2.2', 'localhost', '127.0.0.1'};
+  return !release && uri.scheme == 'http' && localHosts.contains(uri.host);
 }
 
 class HttpApiService implements ApiService {
@@ -192,17 +201,18 @@ class MockApiService implements ApiService {
     'present_reading': 18606,
     'units': 186,
     'tariff_category': 'A-1a(01)',
-    'energy_charges': 4730.26,
-    'fixed_charges': 0,
+    // 186 units, non-protected (July was over 200): 186 × 28.91 (SRO 279(I)/2026)
+    'energy_charges': 5377.26,
+    'fixed_charges': 600, // 2 kW × Rs 300
     'fpa': 152.40,
     'qtr_adjustment': 0,
-    'gst': 878.50,
+    'gst': 1103.34,
     'income_tax': 0,
-    'electricity_duty': 70.95,
-    'tv_fee': 35,
+    'electricity_duty': null, // abolished from July 2025
+    'tv_fee': null, // abolished from July 2025
     'arrears': 0,
-    'total_due': 5867,
-    'late_surcharge': 470,
+    'total_due': 7233,
+    'late_surcharge': 723,
     'due_date': '2026-10-15',
     'history': [
       {'month': '2026-08', 'units': 178, 'amount': 4520},
