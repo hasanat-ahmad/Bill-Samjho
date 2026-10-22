@@ -22,9 +22,20 @@ class ScanCancelled extends ScanState {
   const ScanCancelled();
 }
 
-/// Compressing and uploading ("بل پڑھ رہے ہیں...").
+enum ReadPhase { preparing, uploading, reading }
+
+/// Where the photo comes from. [scanner] is the ML Kit document scanner with
+/// auto-crop; [camera] is the plain system camera, used when the scanner is
+/// unavailable on the phone.
+enum PhotoSource { scanner, camera, gallery }
+
+/// S4 progress (NFR-04): compressing, uploading with real progress, reading.
 class ScanReading extends ScanState {
-  const ScanReading();
+  const ScanReading(this.phase, {this.progress});
+  final ReadPhase phase;
+
+  /// Upload progress 0..1, null when not measurable.
+  final double? progress;
 }
 
 class ScanFailed extends ScanState {
@@ -32,10 +43,11 @@ class ScanFailed extends ScanState {
   final ApiError error;
 }
 
-/// S5: user checks units and total.
+/// S5: user checks units and total against the photo.
 class ScanConfirm extends ScanState {
-  const ScanConfirm(this.data, {this.saving = false});
+  const ScanConfirm(this.data, this.jpeg, {this.saving = false});
   final ExtractedBill data;
+  final Uint8List jpeg;
   final bool saving;
 }
 
@@ -60,11 +72,15 @@ class ScanCubit extends Cubit<ScanState> {
   /// Incremented on cancel so a late upload result is ignored.
   int _attempt = 0;
 
-  Future<void> start({bool fromGallery = false}) async {
-    emit(const ScanOpening());
+  Future<void> start({PhotoSource source = PhotoSource.scanner}) async {
+    _emit(const ScanOpening());
     final String? path;
     try {
-      path = fromGallery ? await _scanner.pickFromGallery() : await _scanner.scan();
+      path = switch (source) {
+        PhotoSource.scanner => await _scanner.scan(),
+        PhotoSource.camera => await _scanner.takePhoto(),
+        PhotoSource.gallery => await _scanner.pickFromGallery(),
+      };
     } catch (_) {
       _emit(const ScanFailed(ApiError.unknown));
       return;
@@ -74,12 +90,14 @@ class ScanCubit extends Cubit<ScanState> {
       return;
     }
 
-    _emit(const ScanReading());
+    _emit(const ScanReading(ReadPhase.preparing));
     try {
       _jpeg = await _scanner.compress(path);
     } catch (_) {
       _emit(const ScanFailed(ApiError.unreadable));
       return;
+    } finally {
+      await _scanner.discard(path);
     }
     await _upload();
   }
@@ -89,10 +107,13 @@ class ScanCubit extends Cubit<ScanState> {
 
   Future<void> _upload() async {
     final attempt = ++_attempt;
-    _emit(const ScanReading());
+    _emit(const ScanReading(ReadPhase.uploading, progress: 0));
     try {
-      final data = await _repo.extract(_jpeg!);
-      if (attempt == _attempt) _emit(ScanConfirm(data));
+      final data = await _repo.extract(_jpeg!, onProgress: (p) {
+        if (attempt != _attempt) return;
+        _emit(p >= 1 ? const ScanReading(ReadPhase.reading) : ScanReading(ReadPhase.uploading, progress: p));
+      });
+      if (attempt == _attempt) _emit(ScanConfirm(data, _jpeg!));
     } on ApiException catch (e) {
       if (attempt == _attempt) _emit(ScanFailed(e.error));
     }
@@ -102,12 +123,12 @@ class ScanCubit extends Cubit<ScanState> {
 
   Future<void> confirm({required int units, required double totalDue}) async {
     final s = state;
-    if (s is! ScanConfirm || s.saving || _jpeg == null) return;
-    _emit(ScanConfirm(s.data, saving: true));
+    if (s is! ScanConfirm || s.saving) return;
+    _emit(ScanConfirm(s.data, s.jpeg, saving: true));
     final bill = await _repo.analyseAndSave(
       connectionId: connectionId,
       data: s.data.copyWith(units: units, totalDue: totalDue),
-      jpeg: _jpeg!,
+      jpeg: s.jpeg,
     );
     _emit(ScanDone(bill));
   }

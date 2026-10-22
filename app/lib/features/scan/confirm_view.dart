@@ -3,17 +3,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/constants.dart';
+import '../../core/i18n.dart';
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/models/extracted_bill.dart';
-import '../../data/models/urdu_strings.dart';
-import '../../domain/urdu_format.dart';
+import '../../domain/format.dart';
 import 'scan_cubit.dart';
 
-/// S5: show month, units, total, due date; units and total editable (FR-07).
+/// S5: month, units, total, due date; units and total editable (FR-07).
 class ConfirmView extends StatefulWidget {
-  const ConfirmView({super.key, required this.data, required this.saving});
+  const ConfirmView({super.key, required this.data, required this.jpeg, required this.saving});
 
   final ExtractedBill data;
+  final Uint8List jpeg;
   final bool saving;
 
   @override
@@ -35,85 +37,147 @@ class _ConfirmViewState extends State<ConfirmView> {
   }
 
   void _submit() {
+    FocusScope.of(context).unfocus();
     if (!_form.currentState!.validate()) return;
-    context.read<ScanCubit>().confirm(
-          units: int.parse(_units.text),
-          totalDue: double.parse(_total.text),
-        );
+    context.read<ScanCubit>().confirm(units: int.parse(_units.text), totalDue: double.parse(_total.text));
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     final theme = Theme.of(context);
-    final strings = context.read<UrduStrings>();
     final data = widget.data;
 
     return Scaffold(
-      appBar: AppBar(title: const Text(Labels.confirmTitle)),
-      body: SafeArea(
-        child: Form(
-          key: _form,
-          child: Column(children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  Text(Labels.confirmHint, style: theme.textTheme.bodyLarge),
-                  if (data.confidence < AppConstants.lowConfidence) ...[
-                    const SizedBox(height: 12),
-                    Card(
-                      color: AppColors.amber.withValues(alpha: 0.2),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(children: [
-                          const Icon(Icons.error, color: Colors.black87, size: 32),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text(Labels.confirmLowConfidence, style: theme.textTheme.bodyLarge)),
-                        ]),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  _InfoRow(label: Labels.month, value: formatMonth(data.billMonth, strings)),
-                  const SizedBox(height: 16),
-                  _NumberField(
-                    controller: _units,
-                    label: Labels.units,
-                    allowDecimal: false,
-                    validator: (v) {
-                      final n = int.tryParse(v ?? '');
-                      return n == null || n < 0 || n > 5000 ? Labels.invalidNumber : null;
-                    },
+      appBar: AppBar(title: Text(s.t('confirm_title'))),
+      body: Form(
+        key: _form,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(Gap.page, Gap.sm, Gap.page, Gap.xl),
+          children: [
+            Text(s.t('confirm_hint'), style: theme.textTheme.bodyMedium),
+            if (data.confidence < AppConstants.lowConfidence) ...[
+              const SizedBox(height: Gap.lg),
+              AppCard(
+                color: AppColors.amberSoft,
+                borderColor: AppColors.amberSoft,
+                padding: const EdgeInsets.all(Gap.lg),
+                child: Row(children: [
+                  const Icon(Icons.error_rounded, color: AppColors.amberInk, size: 28),
+                  const SizedBox(width: Gap.md),
+                  Expanded(
+                    child: Text(s.t('confirm_low_confidence'),
+                        style: theme.textTheme.bodyLarge?.copyWith(color: AppColors.amberInk)),
                   ),
-                  const SizedBox(height: 16),
-                  _NumberField(
-                    controller: _total,
-                    label: '${Labels.totalAmount} (${Labels.rupees})',
-                    allowDecimal: true,
-                    validator: (v) {
-                      final n = double.tryParse(v ?? '');
-                      return n == null || n < 0 ? Labels.invalidNumber : null;
-                    },
-                  ),
-                  if (data.dueDate != null) ...[
-                    const SizedBox(height: 16),
-                    _InfoRow(label: Labels.dueDate, value: formatDate(data.dueDate!, strings)),
-                  ],
-                ],
+                ]),
+              ),
+            ],
+            const SizedBox(height: Gap.lg),
+            _PhotoPreview(widget.jpeg),
+            const SizedBox(height: Gap.lg),
+            _InfoTile(icon: Icons.calendar_month_rounded, label: s.t('month'), value: formatMonth(data.billMonth, s)),
+            const SizedBox(height: Gap.md),
+            _NumberField(
+              controller: _units,
+              label: s.t('units_label'),
+              icon: Icons.bolt_rounded,
+              allowDecimal: false,
+              validator: (v) {
+                final n = int.tryParse(v ?? '');
+                return n == null || n < 0 || n > ExtractedBill.maxUnits ? s.t('invalid_number') : null;
+              },
+            ),
+            const SizedBox(height: Gap.md),
+            _NumberField(
+              controller: _total,
+              label: s.t('total_label'),
+              icon: Icons.payments_rounded,
+              allowDecimal: true,
+              validator: (v) {
+                final n = double.tryParse(v ?? '');
+                return n == null || n < 0 || n > ExtractedBill.maxAmount ? s.t('invalid_number') : null;
+              },
+            ),
+            if (data.dueDate != null) ...[
+              const SizedBox(height: Gap.md),
+              _InfoTile(icon: Icons.event_rounded, label: s.t('due_date'), value: formatDate(data.dueDate!, s)),
+            ],
+          ],
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(Gap.page, Gap.sm, Gap.page, Gap.lg),
+          child: PrimaryButton(
+            label: s.t('looks_right'),
+            icon: Icons.check_rounded,
+            busy: widget.saving,
+            onPressed: _submit,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PhotoPreview extends StatelessWidget {
+  const _PhotoPreview(this.jpeg);
+
+  final Uint8List jpeg;
+
+  void _zoom(BuildContext context) => showDialog<void>(
+        context: context,
+        builder: (context) => Dialog.fullscreen(
+          backgroundColor: Colors.black,
+          child: Stack(children: [
+            Positioned.fill(
+              child: InteractiveViewer(
+                maxScale: 6,
+                child: Center(child: Image.memory(jpeg, fit: BoxFit.contain)),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: SizedBox(
-                width: double.infinity,
-                height: 64,
-                child: FilledButton.icon(
-                  icon: widget.saving
-                      ? const SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white))
-                      : const Icon(Icons.check, size: 32),
-                  label: const Text(Labels.ok, style: TextStyle(fontSize: 24)),
-                  onPressed: widget.saving ? null : _submit,
+            SafeArea(
+              child: Align(
+                alignment: AlignmentDirectional.topEnd,
+                child: IconButton.filled(
+                  style: IconButton.styleFrom(backgroundColor: Colors.white24),
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
                 ),
+              ),
+            ),
+          ]),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    return Semantics(
+      button: true,
+      label: s.t('tap_to_zoom'),
+      child: GestureDetector(
+        onTap: () => _zoom(context),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(Radii.lg),
+            border: Border.all(color: AppColors.border),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(children: [
+            Image.memory(jpeg, height: 180, width: double.infinity, fit: BoxFit.cover, alignment: Alignment.topCenter),
+            PositionedDirectional(
+              bottom: Gap.sm,
+              end: Gap.sm,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.xs + 2),
+                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(999)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.zoom_in_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: Gap.xs),
+                  Text(s.t('tap_to_zoom'), style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white)),
+                ]),
               ),
             ),
           ]),
@@ -123,20 +187,29 @@ class _ConfirmViewState extends State<ConfirmView> {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
+class _InfoTile extends StatelessWidget {
+  const _InfoTile({required this.icon, required this.label, required this.value});
 
+  final IconData icon;
   final String label;
   final String value;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(children: [
-      Text('$label:', style: theme.textTheme.titleMedium),
-      const SizedBox(width: 12),
-      Expanded(child: Text(value, style: theme.textTheme.titleLarge)),
-    ]);
+    return AppCard(
+      padding: const EdgeInsets.all(Gap.lg),
+      child: Row(children: [
+        IconBadge(icon, color: AppColors.primary, background: AppColors.primarySoft, size: 44),
+        const SizedBox(width: Gap.md),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: theme.textTheme.bodySmall),
+            Text(value, style: theme.textTheme.titleMedium),
+          ]),
+        ),
+      ]),
+    );
   }
 }
 
@@ -144,31 +217,38 @@ class _NumberField extends StatelessWidget {
   const _NumberField({
     required this.controller,
     required this.label,
+    required this.icon,
     required this.allowDecimal,
     required this.validator,
   });
 
   final TextEditingController controller;
   final String label;
+  final IconData icon;
   final bool allowDecimal;
   final FormFieldValidator<String> validator;
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      validator: validator,
-      keyboardType: TextInputType.numberWithOptions(decimal: allowDecimal),
-      inputFormatters: [_WesternDigitsFormatter(allowDecimal: allowDecimal)],
-      textDirection: TextDirection.ltr,
-      textAlign: TextAlign.center,
-      style: numberStyle.copyWith(fontSize: 32),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(fontSize: 22),
-        suffixIcon: const Icon(Icons.edit),
+    final theme = Theme.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsetsDirectional.only(start: Gap.xs, bottom: Gap.xs),
+        child: Text(label, style: theme.textTheme.titleSmall),
       ),
-    );
+      TextFormField(
+        controller: controller,
+        validator: validator,
+        keyboardType: TextInputType.numberWithOptions(decimal: allowDecimal),
+        inputFormatters: [_WesternDigitsFormatter(allowDecimal: allowDecimal), LengthLimitingTextInputFormatter(10)],
+        textDirection: TextDirection.ltr,
+        style: numberStyle(30),
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: AppColors.primary, size: 28),
+          suffixIcon: const Icon(Icons.edit_rounded, color: AppColors.inkMuted),
+        ),
+      ),
+    ]);
   }
 }
 
