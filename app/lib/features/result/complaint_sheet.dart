@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants.dart';
+import '../../core/i18n.dart';
 import '../../core/theme.dart';
 
 /// S7: pre-filled complaint text with Copy, Share and Call 118 (FR-14).
@@ -11,8 +13,10 @@ Future<void> showComplaintSheet(BuildContext context, String text) => showModalB
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => _ComplaintSheet(text),
+      builder: (_) => RepositoryProvider.value(
+        value: context.read<AppStrings>(),
+        child: _ComplaintSheet(text),
+      ),
     );
 
 class _ComplaintSheet extends StatefulWidget {
@@ -34,50 +38,92 @@ class _ComplaintSheetState extends State<_ComplaintSheet> {
   }
 
   Future<void> _copy() async {
+    final message = context.read<AppStrings>().t('copied');
     await Clipboard.setData(ClipboardData(text: _text.text));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text(Labels.copied)));
-    }
+    HapticFeedback.lightImpact();
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     final theme = Theme.of(context);
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        padding: const EdgeInsets.fromLTRB(Gap.page, 0, Gap.page, Gap.xl),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(Labels.complaintTitle, style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
-          const SizedBox(height: 12),
+          Text(s.t('complaint_title'), style: theme.textTheme.titleLarge),
+          const SizedBox(height: Gap.xs),
+          Text(s.t('complaint_hint'), style: theme.textTheme.bodySmall),
+          const SizedBox(height: Gap.lg),
           TextField(
             controller: _text,
             minLines: 5,
             maxLines: 10,
-            style: const TextStyle(fontSize: 18, height: 1.6),
+            maxLength: 1000,
+            style: theme.textTheme.bodyLarge,
+            decoration: const InputDecoration(counterText: ''),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: Gap.lg),
           Row(children: [
+            Expanded(child: _ActionTile(icon: Icons.copy_rounded, label: s.t('copy'), onTap: _copy)),
+            const SizedBox(width: Gap.sm),
             Expanded(
-              child: OutlinedButton.icon(icon: const Icon(Icons.copy), label: const Text(Labels.copy), onPressed: _copy),
+              child: _ActionTile(
+                icon: Icons.share_rounded,
+                label: s.t('share'),
+                onTap: () => SharePlus.instance.share(ShareParams(text: _text.text)),
+              ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: Gap.sm),
             Expanded(
-              child: FilledButton.icon(
-                icon: const Icon(Icons.share),
-                label: const Text(Labels.share),
-                onPressed: () => SharePlus.instance.share(ShareParams(text: _text.text)),
+              child: _ActionTile(
+                icon: Icons.call_rounded,
+                label: s.t('call'),
+                color: AppColors.green,
+                background: AppColors.greenSoft,
+                onTap: () => launchUrl(Uri(scheme: 'tel', path: AppConstants.helplineNumber)),
               ),
             ),
           ]),
-          const SizedBox(height: 10),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.green, minimumSize: const Size.fromHeight(60)),
-            icon: const Icon(Icons.call, size: 28),
-            label: const Text(Labels.call118),
-            onPressed: () => launchUrl(Uri(scheme: 'tel', path: AppConstants.helplineNumber)),
-          ),
         ]),
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.color = AppColors.primary,
+    this.background = AppColors.primarySoft,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(Radii.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(Radii.md),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: Gap.lg, horizontal: Gap.xs),
+          child: Column(children: [
+            Icon(icon, color: color, size: 30),
+            const SizedBox(height: Gap.sm),
+            Text(label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color)),
+          ]),
+        ),
       ),
     );
   }

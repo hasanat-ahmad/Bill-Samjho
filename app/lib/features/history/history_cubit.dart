@@ -5,7 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/bill_repository.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/connection.dart';
-import '../../domain/urdu_format.dart';
+import '../../domain/format.dart';
 
 class HistoryState {
   const HistoryState({this.connection, this.bills = const [], this.chart = const []});
