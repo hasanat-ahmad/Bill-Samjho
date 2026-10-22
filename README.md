@@ -1,8 +1,8 @@
 # Bill Samjho — بل سمجھو
 
-Android app that reads a photo of a Pakistani electricity bill (WAPDA DISCOs and K-Electric) and explains it in simple Urdu, by text and voice. It says whether the bill looks normal and warns about the 200-unit protected limit.
+Android app that reads a photo of a Pakistani electricity bill (WAPDA DISCOs and K-Electric) and explains it in simple words, by text and voice, in **English (default) or Urdu**. It says whether the bill looks normal and warns about the 200-unit protected limit.
 
-Full requirements and design: [bill-samjho-srs-sda.md](bill-samjho-srs-sda.md).
+Full requirements and design: [bill-samjho-srs-sda.md](bill-samjho-srs-sda.md). Security design: [SECURITY.md](SECURITY.md).
 
 ```
 app/         Flutter app (Android only)
@@ -10,35 +10,49 @@ functions/   Firebase Cloud Function `extractBill` (TypeScript, Gemini)
 firebase.json, firestore.rules
 ```
 
-**Key principle:** AI only reads the image. The rules engine on the phone makes every judgement and fills every number into fixed Urdu templates.
+**Key principle:** AI only reads the image. The rules engine on the phone makes every judgement and fills every number into fixed templates.
 
-## Run the app (no backend needed)
+## Changes from the SRS
 
-Without a backend URL the app runs in mock mode and returns a sample LESCO bill.
+| SRS | Now | Why |
+|---|---|---|
+| NFR-02: UI in Urdu | English by default; English/اردو switch on the first screen and in Settings. Urdu is fully right-to-left with Noto Nastaliq. | Product owner decision. |
+| §8 `Finding.urduText` | `Finding.params` (raw values); text is built when shown | A saved bill is explained in whichever language is chosen later. |
+| §10.3 `urdu_strings.json` | `assets/i18n/en.json` and `ur.json` (UI labels, templates, errors, glossary) | Two languages; a test checks both files have the same keys and placeholders. |
+
+## Run the app
+
+Debug builds without a backend URL run in **demo mode**: a sample LESCO bill, with a banner saying so.
 
 ```sh
 cd app
 flutter pub get
-flutter run                                   # mock mode (default when EXTRACT_URL is not set)
-flutter test                                  # rules engine, repository and UI flow tests
+flutter run                                   # demo mode (debug only)
+flutter test                                  # rules engine, security, i18n and UI flow tests
 ```
 
 With the real backend:
 
 ```sh
 flutter run --dart-define=EXTRACT_URL=https://asia-south1-<project-id>.cloudfunctions.net/extractBill
-
-# Play Store: the bundle delivers one CPU architecture per phone
-flutter build appbundle --release --dart-define=EXTRACT_URL=...
-# Sideloading: one APK per architecture (most phones need app-arm64-v8a-release.apk)
-flutter build apk --release --split-per-abi --dart-define=EXTRACT_URL=...
 ```
 
-A plain `flutter build apk` makes a universal APK (~54 MB) holding all three architectures; the per-architecture APKs stay under the 25 MB limit (NFR-06).
+Release builds (obfuscated, debug symbols kept out of the APK):
+
+```sh
+# Play Store: the bundle delivers one CPU architecture per phone
+flutter build appbundle --release --obfuscate --split-debug-info=build/symbols \
+  --dart-define=EXTRACT_URL=https://...
+# Sideloading: one APK per architecture (most phones need app-arm64-v8a-release.apk, ~20 MB)
+flutter build apk --release --split-per-abi --obfuscate --split-debug-info=build/symbols \
+  --dart-define=EXTRACT_URL=https://...
+```
+
+A release build never falls back to demo data: without a valid `https://` `EXTRACT_URL` scanning shows "not available" (unless `--dart-define=USE_MOCK_API=true` is passed explicitly, which shows the demo banner). A plain `flutter build apk` makes a universal APK (~54 MB); the per-architecture APKs stay under the 25 MB limit (NFR-06).
 
 ## Firebase setup
 
-The app works without Firebase: it uses the bundled tariff config and no crash reporting. To connect it:
+The app works without Firebase: it uses the bundled tariff config, no crash reporting and no App Check. To connect it:
 
 1. Create a Firebase project and **upgrade it to the Blaze plan** (required for Cloud Functions and Secret Manager).
 2. Link the Android app. This creates `app/android/app/google-services.json`; Gradle then turns on the Firebase and Crashlytics plugins automatically.
@@ -46,39 +60,43 @@ The app works without Firebase: it uses the bundled tariff config and no crash r
    dart pub global activate flutterfire_cli
    cd app && flutterfire configure --platforms=android
    ```
-3. Deploy the backend:
+3. **App Check:** in the Firebase console, register the app with the **Play Integrity** provider (add the release SHA-256 signing fingerprint). For debug builds, add the debug token printed in logcat.
+4. Deploy the backend:
    ```sh
    firebase use <project-id>
-   cp functions/.env.example functions/.env        # set GEMINI_MODEL
-   firebase functions:secrets:set GEMINI_API_KEY   # key stays on the server only
+   cp functions/.env.example functions/.env           # set GEMINI_MODEL
+   firebase functions:secrets:set GEMINI_API_KEY      # stays on the server only
+   firebase functions:secrets:set RATE_LIMIT_SECRET   # any long random string, e.g. `openssl rand -hex 32`
    firebase deploy --only functions,firestore
    ```
-4. In the Firestore console, add a **TTL policy** on collection `rateLimits`, field `expiresAt`, so old rate-limit counters are deleted.
-5. In **Remote Config**, add parameter `tariff_config` (type JSON) with the contents of `app/assets/tariff_config_default.json`. Tariff changes then reach users without an app release.
+5. In the Firestore console, add a **TTL policy** on collection `rateLimits`, field `expiresAt`, so old rate-limit counters are deleted.
+6. In **Remote Config**, add parameter `tariff_config` (type JSON) with the contents of `app/assets/tariff_config_default.json`. Tariff changes then reach users without an app release. Out-of-range values are rejected by the app.
+7. In Google Cloud console, set a **daily quota** on the Gemini API key as a cost ceiling.
 
 ## Backend
 
-`POST /extractBill`, multipart: `image` (JPEG ≤ 500 KB) and `deviceId` (UUID).
+`POST /extractBill`, multipart: `image` (JPEG ≤ 500 KB) and `deviceId` (UUID), header `X-Firebase-AppCheck`.
 
 | Status | Body | Meaning |
 |---|---|---|
 | 200 | ExtractedBill JSON (snake_case) | Read successfully |
-| 400 | `{"error":"not_a_bill"}` / `{"error":"unreadable"}` | Wrong photo or unclear |
+| 400 | `{"error":"not_a_bill"}` / `{"error":"unreadable"}` | Wrong photo, unclear, or not a JPEG |
+| 401 | `{"error":"unauthorized"}` | Missing or invalid App Check token |
 | 413 | `{"error":"too_large"}` | Image over 500 KB |
-| 429 | `{"error":"rate_limited"}` | 30 requests per device per day |
-| 503 | `{"error":"ai_busy"}` | Gemini unavailable |
+| 429 | `{"error":"rate_limited"}` | 30 per device / 300 per IP per day |
+| 503 | `{"error":"ai_busy"}` | Gemini unavailable or timed out |
 
-The image is parsed in memory and never stored or logged. Firestore holds only per-device daily counters.
+The image is parsed in memory and never stored or logged. Firestore holds only daily counters keyed by device ID and a keyed hash of the IP.
 
 ```sh
-cd functions && npm install && npm test
+cd functions && npm install && npm test && npm audit
 ```
 
 ## Before release: VERIFY / TODO
 
 - [ ] **Tariff rates and slab method** in `tariff_config_default.json` against the latest NEPRA notification, including the "all units at one slab rate above 200" rule for non-protected consumers.
 - [ ] **Gemini model name** in `functions/.env` (`GEMINI_MODEL`).
-- [ ] **Urdu text review** by a native speaker: `app/assets/urdu_strings.json` and `Labels` in `app/lib/core/constants.dart`.
+- [ ] **Urdu text review** by a native speaker: `app/assets/i18n/ur.json`.
 - [ ] Release signing config in `app/android/app/build.gradle.kts` (currently debug keys).
 - [ ] Test with 20 real bills from at least 3 DISCOs (acceptance target: ≥ 18 read correctly).
-- [ ] Rate limiting trusts the device ID sent by the app; consider Firebase App Check if abuse appears.
+- [ ] Usability test with 5 non-technical users in both languages (acceptance criterion).
