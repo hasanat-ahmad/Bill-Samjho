@@ -6,6 +6,9 @@ import '../data/models/finding.dart';
 import '../data/models/tariff_config.dart';
 import 'format.dart';
 
+/// Domestic tariff categories (NEPRA A-1 residential).
+enum Tariff { lifeline, protected, nonProtected }
+
 class RulesResult {
   const RulesResult(this.verdict, this.findings);
 
@@ -50,23 +53,42 @@ class RulesEngine {
     return RulesResult(verdict, [_summary(current), ..._stableSortBySeverity(findings)]);
   }
 
-  /// Energy charge in rupees for [units], or null when the tariff does not
-  /// apply (protected rates above the protected limit).
-  double? computeEnergy(int units, {required bool protected}) {
+  /// Energy charge in rupees for [units] under [tariff], as notified in
+  /// S.R.O. 279(I)/2026, or null when the tariff does not apply.
+  ///
+  /// - Protected: benefit of one previous slab (first 100 at the lower rate).
+  /// - Lifeline: no slab benefit; all units at the slab the total falls in.
+  /// - Non-protected: all units at the slab the total falls in, above
+  ///   `non_protected_flat_above_units`.
+  double? computeEnergy(int units, Tariff tariff) {
     if (units <= 0) return 0;
-    if (protected) {
-      if (units > config.protectedLimitUnits) return null;
-      return _incremental(units, config.protectedSlabs);
+    switch (tariff) {
+      case Tariff.protected:
+        if (units > config.protectedLimitUnits) return null;
+        return _incremental(units, config.protectedSlabs);
+      case Tariff.lifeline:
+        if (config.lifelineSlabs.isEmpty || units > config.lifelineLimitUnits) return null;
+        return _landing(units, config.lifelineSlabs);
+      case Tariff.nonProtected:
+        return units > config.nonProtectedFlatAboveUnits
+            ? _landing(units, config.nonProtectedSlabs)
+            : _incremental(units, config.nonProtectedSlabs);
     }
-    if (units > config.nonProtectedFlatAboveUnits) {
-      // VERIFY: all units at the rate of the slab the total falls in.
-      final slab = config.nonProtectedSlabs.lastWhere(
-        (s) => s.contains(units),
-        orElse: () => config.nonProtectedSlabs.last,
-      );
-      return _round2(units * slab.rate);
-    }
-    return _incremental(units, config.nonProtectedSlabs);
+  }
+
+  /// Every way a correct bill for [units] could have been calculated. The
+  /// older progressive method for non-protected homes is kept as a tolerance,
+  /// so the app never calls a bill wrong because of a billing-method detail.
+  List<double> _energyCandidates(int units) => [
+        for (final t in Tariff.values) ?computeEnergy(units, t),
+        if (units <= config.protectedLimitUnits) _incremental(units, config.nonProtectedSlabs),
+        if (config.lifelineSlabs.isNotEmpty && units <= config.lifelineLimitUnits)
+          _incremental(units, config.lifelineSlabs),
+      ];
+
+  double _landing(int units, List<Slab> slabs) {
+    final slab = slabs.lastWhere((s) => s.contains(units), orElse: () => slabs.last);
+    return _round2(units * slab.rate);
   }
 
   double _incremental(int units, List<Slab> slabs) {
@@ -127,10 +149,11 @@ class RulesEngine {
   Finding? _energyCheck(ExtractedBill b) {
     final printed = b.energyCharges;
     if (printed == null || b.units <= 0) return null;
-    final candidates = [
-      computeEnergy(b.units, protected: true),
-      computeEnergy(b.units, protected: false),
-    ].whereType<double>().where((c) => c > 0).toList();
+    // Older bills were charged at older rates; do not judge them by today's.
+    final billIndex = monthIndex(b.billMonth);
+    final effective = config.effectiveFrom == null ? null : monthIndex(config.effectiveFrom!);
+    if (effective != null && (billIndex == null || billIndex < effective)) return null;
+    final candidates = _energyCandidates(b.units).where((c) => c > 0).toList();
     if (candidates.isEmpty) return null;
 
     double diffPercent(double c) => (c - printed).abs() / c * 100;

@@ -67,26 +67,33 @@ Finding finding(ExtractedBill b, String ruleId, [List<Bill> past = const []]) =>
     engine.evaluate(b, past).findings.firstWhere((f) => f.ruleId == ruleId);
 
 void main() {
-  group('energy slabs', () {
-    test('protected (incremental)', () {
-      expect(engine.computeEnergy(0, protected: true), 0);
-      expect(engine.computeEnergy(100, protected: true), 1054.00);
-      expect(engine.computeEnergy(101, protected: true), 1067.01);
-      expect(engine.computeEnergy(180, protected: true), 2094.80);
-      expect(engine.computeEnergy(200, protected: true), 2355.00);
-      expect(engine.computeEnergy(201, protected: true), isNull);
+  group('energy slabs (S.R.O. 279(I)/2026)', () {
+    test('protected: one previous slab benefit', () {
+      expect(engine.computeEnergy(0, Tariff.protected), 0);
+      expect(engine.computeEnergy(100, Tariff.protected), 1054.00);
+      expect(engine.computeEnergy(101, Tariff.protected), 1067.01);
+      expect(engine.computeEnergy(180, Tariff.protected), 2094.80);
+      expect(engine.computeEnergy(200, Tariff.protected), 2355.00);
+      expect(engine.computeEnergy(201, Tariff.protected), isNull);
     });
 
-    test('non-protected: incremental up to 200, flat above', () {
-      expect(engine.computeEnergy(0, protected: false), 0);
-      expect(engine.computeEnergy(100, protected: false), 2244.00);
-      expect(engine.computeEnergy(101, protected: false), 2272.91);
-      expect(engine.computeEnergy(180, protected: false), 4556.80);
-      expect(engine.computeEnergy(200, protected: false), 5135.00);
-      expect(engine.computeEnergy(201, protected: false), 6653.10); // 201 × 33.10
-      expect(engine.computeEnergy(300, protected: false), 9930.00); // 300 × 33.10
-      expect(engine.computeEnergy(301, protected: false), 11434.99); // 301 × 37.99
-      expect(engine.computeEnergy(701, protected: false), 33430.69); // 701 × 47.69
+    test('non-protected: all units at the slab the total falls in', () {
+      expect(engine.computeEnergy(0, Tariff.nonProtected), 0);
+      expect(engine.computeEnergy(100, Tariff.nonProtected), 2244.00); // 100 × 22.44
+      expect(engine.computeEnergy(101, Tariff.nonProtected), 2919.91); // 101 × 28.91
+      expect(engine.computeEnergy(180, Tariff.nonProtected), 5203.80);
+      expect(engine.computeEnergy(200, Tariff.nonProtected), 5782.00);
+      expect(engine.computeEnergy(201, Tariff.nonProtected), 6653.10); // 201 × 33.10
+      expect(engine.computeEnergy(300, Tariff.nonProtected), 9930.00);
+      expect(engine.computeEnergy(301, Tariff.nonProtected), 10974.46); // 301 × 36.46
+      expect(engine.computeEnergy(701, Tariff.nonProtected), 33087.20); // 701 × 47.20
+    });
+
+    test('lifeline: no slab benefit, only up to 100 units', () {
+      expect(engine.computeEnergy(50, Tariff.lifeline), 197.50); // 50 × 3.95
+      expect(engine.computeEnergy(51, Tariff.lifeline), 394.74); // 51 × 7.74
+      expect(engine.computeEnergy(100, Tariff.lifeline), 774.00);
+      expect(engine.computeEnergy(101, Tariff.lifeline), isNull);
     });
   });
 
@@ -104,8 +111,20 @@ void main() {
       expect(rulesFired(bill(units: 150, energy: 1704.5 * 1.02)), isNot(contains('R1')));
     });
 
-    test('passes when matching non-protected', () {
-      expect(rulesFired(bill(units: 150, energy: 3689.5)), isNot(contains('R1')));
+    test('passes when matching non-protected (official or older method)', () {
+      expect(rulesFired(bill(units: 150, energy: 4336.5)), isNot(contains('R1'))); // 150 × 28.91
+      expect(rulesFired(bill(units: 150, energy: 3689.5)), isNot(contains('R1'))); // progressive
+    });
+
+    test('bills older than the current tariff are not checked', () {
+      // April 2017 GEPCO bill: 50 units for Rs 100 was right at 2017 rates.
+      expect(rulesFired(bill(month: '2017-04', units: 50, energy: 100)), isNot(contains('R1')));
+      expect(rulesFired(bill(month: '2026-09', units: 50, energy: 100)), contains('R1'));
+    });
+
+    test('lifeline bills are not flagged', () {
+      expect(rulesFired(bill(units: 40, energy: 158)), isNot(contains('R1'))); // 40 × 3.95
+      expect(rulesFired(bill(units: 80, energy: 619.2)), isNot(contains('R1'))); // 80 × 7.74
     });
 
     test('above protected limit compares with non-protected only', () {
@@ -297,6 +316,13 @@ void main() {
       expect(urdu, startsWith(ur.verdictSentence(Verdict.check)));
       expect(urdu.indexOf('190'), lessThan(urdu.indexOf('بقایا')));
       expect('$english $urdu', isNot(contains('{')));
+    });
+
+    test('credit bill: nothing to pay, in both languages', () {
+      final summary = engine.evaluate(bill(units: 50, total: -297), const []).findings.first;
+      expect(en.findingText(summary), contains('credit of Rs 297'));
+      expect(en.findingText(summary), contains('nothing to pay'));
+      expect(ur.findingText(summary), contains('297 روپے کریڈٹ'));
     });
 
     test('every rule renders a full sentence in both languages', () {

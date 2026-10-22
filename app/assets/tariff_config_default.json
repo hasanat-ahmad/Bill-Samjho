@@ -1,11 +1,17 @@
 {
-  "_comment": "VERIFY: all rates and the slab method against the latest NEPRA notification before release. Rates are from 2026 news reports. Live values come from Firebase Remote Config key 'tariff_config'.",
-  "version": "2026-10",
-  "source_url": "https://nepra.org.pk",
+  "_comment": "Domestic (A-1 residential) rates from NEPRA decision TRF-100 (11 Feb 2026), notified as S.R.O. 279(I)/2026 on 12 Feb 2026. Fixed charges (Rs/kW of sanctioned load) are not modelled: the rules engine checks only the 'cost of electricity' line. Live values come from Firebase Remote Config key 'tariff_config'. Re-check after every NEPRA tariff notification.",
+  "version": "2026-02 (SRO 279(I)/2026)",
+  "effective_from": "2026-03",
+  "source_url": "https://nepra.org.pk/tariff/Tariff/Ex-WAPDA%20DISCOS/2026/TRF-100%20XWDISCOS%20AND%20KE%20RATIONALIZATION%20OF%20TARIFF%2011-02-2026%202935-57.pdf",
   "protected_limit_units": 200,
   "protected_months": 6,
   "near_limit_units": 180,
+  "lifeline_limit_units": 100,
   "slabs": {
+    "lifeline": [
+      {"from": 1, "to": 50, "rate": 3.95},
+      {"from": 51, "to": 100, "rate": 7.74}
+    ],
     "protected": [
       {"from": 1, "to": 100, "rate": 10.54},
       {"from": 101, "to": 200, "rate": 13.01}
@@ -14,13 +20,16 @@
       {"from": 1, "to": 100, "rate": 22.44},
       {"from": 101, "to": 200, "rate": 28.91},
       {"from": 201, "to": 300, "rate": 33.10},
-      {"from": 301, "to": 400, "rate": 37.99},
-      {"from": 401, "to": 500, "rate": 40.22},
-      {"from": 501, "to": 600, "rate": 41.62},
-      {"from": 601, "to": 700, "rate": 42.76},
-      {"from": 701, "to": null, "rate": 47.69}
+      {"from": 301, "to": 400, "rate": 36.46},
+      {"from": 401, "to": 500, "rate": 38.95},
+      {"from": 501, "to": 600, "rate": 40.22},
+      {"from": 601, "to": 700, "rate": 41.85},
+      {"from": 701, "to": null, "rate": 47.20}
     ]
   },
-  "non_protected_flat_above_units": 200,
-  "energy_tolerance_percent": 3
+  "non_protected_flat_above_units": 100,
+  "energy_tolerance_percent": 3,
+  "history_months": 6,
+  "jump_check_ratio": 1.4,
+  "jump_wrong_ratio": 2.0
 }

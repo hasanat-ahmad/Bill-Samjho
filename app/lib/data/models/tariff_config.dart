@@ -12,6 +12,9 @@ class TariffConfig {
     required this.nonProtectedSlabs,
     required this.nonProtectedFlatAboveUnits,
     required this.energyTolerancePercent,
+    this.effectiveFrom,
+    this.lifelineSlabs = const [],
+    this.lifelineLimitUnits = 100,
     this.historyMonths = 6,
     this.jumpCheckRatio = 1.4,
     this.jumpWrongRatio = 2.0,
@@ -27,6 +30,14 @@ class TariffConfig {
   final int nonProtectedFlatAboveUnits;
   final double energyTolerancePercent;
 
+  /// First bill month ("YYYY-MM") these rates apply to. The energy check is
+  /// skipped for older bills, which were billed at older rates.
+  final String? effectiveFrom;
+
+  /// Lifeline tariff (poorest homes, ≤ 100 units, ≤ 1 kW). Optional in JSON.
+  final List<Slab> lifelineSlabs;
+  final int lifelineLimitUnits;
+
   /// R2 big-jump thresholds. Optional in JSON, defaults per SDA §10.2.
   final int historyMonths;
   final double jumpCheckRatio;
@@ -38,6 +49,7 @@ class TariffConfig {
     final slabs = json['slabs'] as Map<String, dynamic>;
     final protectedSlabs = _slabs(slabs['protected']);
     final nonProtectedSlabs = _slabs(slabs['non_protected']);
+    final lifelineSlabs = slabs['lifeline'] == null ? <Slab>[] : _slabs(slabs['lifeline']);
     if (protectedSlabs.isEmpty || nonProtectedSlabs.isEmpty) {
       throw const FormatException('tariff_config has empty slabs');
     }
@@ -51,6 +63,9 @@ class TariffConfig {
       nonProtectedSlabs: nonProtectedSlabs,
       nonProtectedFlatAboveUnits: (json['non_protected_flat_above_units'] as num).toInt(),
       energyTolerancePercent: (json['energy_tolerance_percent'] as num).toDouble(),
+      effectiveFrom: json['effective_from'] as String?,
+      lifelineSlabs: lifelineSlabs,
+      lifelineLimitUnits: (json['lifeline_limit_units'] as num?)?.toInt() ?? 100,
       historyMonths: (json['history_months'] as num?)?.toInt() ?? 6,
       jumpCheckRatio: (json['jump_check_ratio'] as num?)?.toDouble() ?? 1.4,
       jumpWrongRatio: (json['jump_wrong_ratio'] as num?)?.toDouble() ?? 2.0,
@@ -69,9 +84,10 @@ class TariffConfig {
         ok(nonProtectedFlatAboveUnits, 0, 5000) &&
         ok(energyTolerancePercent, 0, 50) &&
         ok(historyMonths, 1, 24) &&
+        ok(lifelineLimitUnits, 0, protectedLimitUnits) &&
         ok(jumpCheckRatio, 1, 10) &&
         ok(jumpWrongRatio, jumpCheckRatio, 20) &&
-        [...protectedSlabs, ...nonProtectedSlabs]
+        [...lifelineSlabs, ...protectedSlabs, ...nonProtectedSlabs]
             .every((s) => ok(s.rate, 0.01, 1000) && s.from >= 1 && (s.to == null || s.to! >= s.from));
     if (!valid) throw const FormatException('tariff_config value out of range');
   }
