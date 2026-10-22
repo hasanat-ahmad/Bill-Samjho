@@ -6,3 +6,8 @@ functions/.env
 .DS_Store
 # Firebase app config (contains project identifiers)
 app/android/app/google-services.json
+
+# Firebase emulator secrets (local only, never commit)
+functions/.secret.local
+functions/.env
+functions/.env.local
