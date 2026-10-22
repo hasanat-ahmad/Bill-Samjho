@@ -38,7 +38,7 @@ class BillRepository {
   bool get isDemo => _api.isMock;
 
   /// False until the photo-reading backend is configured for this build.
-  bool get canScanPhotos => _api is! UnavailableApiService;
+  bool get canScanPhotos => _api.available;
 
   /// Fires after any connection or bill is added or deleted.
   Stream<void> get changes => _changes.stream;

@@ -14,22 +14,24 @@ class TariffConfigService {
   static const _assetPath = 'assets/tariff_config_default.json';
 
   late TariffConfig _config;
+  late String _bundled;
   TariffConfig get config => _config;
 
-  /// Loads the bundled copy, then the last activated remote value. A fresh
-  /// fetch runs in the background so slow internet never blocks startup.
-  Future<void> load({required bool firebaseReady}) async {
-    final bundled = await rootBundle.loadString(_assetPath);
-    _config = TariffConfig.fromJson(jsonDecode(bundled) as Map<String, dynamic>);
-    if (!firebaseReady) return;
+  /// Loads the bundled copy; call before the first screen.
+  Future<void> loadBundled() async {
+    _bundled = await rootBundle.loadString(_assetPath);
+    _config = TariffConfig.fromJson(jsonDecode(_bundled) as Map<String, dynamic>);
+  }
 
+  /// Switches to Remote Config once Firebase is ready (in the background).
+  Future<void> connectRemote() async {
     try {
       final rc = FirebaseRemoteConfig.instance;
       await rc.setConfigSettings(RemoteConfigSettings(
         fetchTimeout: const Duration(seconds: 10),
         minimumFetchInterval: const Duration(hours: 1),
       ));
-      await rc.setDefaults({_remoteKey: bundled});
+      await rc.setDefaults({_remoteKey: _bundled});
       await rc.activate();
       _applyRemote(rc);
       unawaited(rc.fetchAndActivate().then((_) => _applyRemote(rc)).catchError((Object e) {

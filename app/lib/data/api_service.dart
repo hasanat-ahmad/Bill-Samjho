@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/constants.dart';
+import '../core/firebase_gate.dart';
 import 'firebase_ai_api_service.dart';
 import 'models/extracted_bill.dart';
 
@@ -55,11 +56,14 @@ abstract class ApiService {
 
   bool get isMock => false;
 
+  /// False when photos cannot be read in this build (checked before the camera).
+  bool get available;
+
   /// Picks how bills are read: sample data (only if asked for), a paid
   /// backend at `EXTRACT_URL`, or Gemini through Firebase AI Logic (free
   /// Spark plan) when Firebase is configured.
   /// [appCheckToken] attests the request comes from the genuine app.
-  factory ApiService.create({bool firebaseReady = false, Future<String?> Function()? appCheckToken}) {
+  factory ApiService.create({FirebaseGate? firebase, Future<String?> Function()? appCheckToken}) {
     if (Env.useMockApi) return MockApiService();
     if (Env.extractUrl.isNotEmpty) {
       final uri = Uri.tryParse(Env.extractUrl);
@@ -68,7 +72,7 @@ abstract class ApiService {
       }
       return HttpApiService(uri, appCheckToken: appCheckToken);
     }
-    if (firebaseReady) return FirebaseAiApiService();
+    if (firebase != null) return FirebaseAiApiService(firebase);
     return UnavailableApiService();
   }
 }
@@ -100,6 +104,9 @@ class HttpApiService implements ApiService {
 
   @override
   bool get isMock => false;
+
+  @override
+  bool get available => true;
 
   @override
   Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId, {ProgressCallback? onProgress}) async {
@@ -199,6 +206,9 @@ class UnavailableApiService implements ApiService {
   bool get isMock => false;
 
   @override
+  bool get available => false;
+
+  @override
   Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId, {ProgressCallback? onProgress}) =>
       Future.error(const ApiException(ApiError.unavailable));
 
@@ -213,6 +223,9 @@ class UnavailableApiService implements ApiService {
 class MockApiService implements ApiService {
   @override
   bool get isMock => true;
+
+  @override
+  bool get available => true;
 
   @override
   Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId, {ProgressCallback? onProgress}) async {
