@@ -87,6 +87,12 @@ class _ComplaintSheetState extends State<_ComplaintSheet> {
               ),
             ),
           ]),
+          const SizedBox(height: Gap.lg),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.gavel_rounded, color: AppColors.inkMuted, size: 22),
+            const SizedBox(width: Gap.sm),
+            Expanded(child: Text(s.t('complaint_escalate'), style: theme.textTheme.bodySmall)),
+          ]),
         ]),
       ),
     );

@@ -24,6 +24,7 @@ class _GlossaryScreenState extends State<GlossaryScreen> {
     'fixed': Icons.push_pin_rounded,
     'history': Icons.history_rounded,
     'late': Icons.schedule_rounded,
+    'tv': Icons.tv_off_rounded,
   };
 
   @override

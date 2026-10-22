@@ -115,7 +115,7 @@ void main() {
     expect(find.text('Check the numbers'), findsOneWidget);
     expect(find.text('September 2026'), findsOneWidget);
     expect(find.widgetWithText(TextFormField, '186'), findsOneWidget);
-    expect(find.widgetWithText(TextFormField, '5867'), findsOneWidget);
+    expect(find.widgetWithText(TextFormField, '7233'), findsOneWidget);
 
     // Alt 5a: correct the units with Urdu-keyboard digits ۱۹۰ → 190.
     await tester.enterText(find.widgetWithText(TextFormField, '186'), '۱۹۰');
@@ -124,7 +124,7 @@ void main() {
     // Tap 3: confirm → S6 result.
     await tapAsync(tester, find.text('Looks right'));
     expect(find.text('Listen to explanation'), findsOneWidget);
-    expect(find.text('Rs 5,867'), findsOneWidget);
+    expect(find.text('Rs 7,233'), findsOneWidget);
     // Sample history has July at 212 units → protected rate lost → "Check this".
     expect(find.text('Check this'), findsOneWidget);
     final summary = find.textContaining('This month you used 190 units');
@@ -172,7 +172,7 @@ void main() {
     await pumpApp(tester);
 
     expect(find.text('Shop'), findsOneWidget);
-    expect(find.text('Rs 5,867'), findsOneWidget);
+    expect(find.text('Rs 7,233'), findsOneWidget);
     expect(find.text('Check this'), findsOneWidget);
 
     await tester.tap(find.text('Shop'));
@@ -206,7 +206,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('سیٹنگز'), findsOneWidget);
     await goBack(tester);
-    expect(find.text('5,867 روپے'), findsOneWidget);
+    expect(find.text('7,233 روپے'), findsOneWidget);
     expect(find.text('دیکھیں'), findsOneWidget);
 
     await tester.tap(find.text('Shop'));
