@@ -1,3 +1,5 @@
+import '../../domain/format.dart';
+
 /// Bill data read from the photo by the backend (snake_case JSON, SDA §9.1).
 class ExtractedBill {
   const ExtractedBill({
@@ -73,6 +75,76 @@ class ExtractedBill {
             .toList(),
         confidence: _double(json['confidence']) ?? 0,
       );
+
+  static const maxUnits = 5000;
+  static const maxAmount = 10000000.0;
+  static const maxHistoryRows = 24;
+
+  /// Parses a backend response as untrusted input (NFR-09): required fields
+  /// must be present and in range, text is capped and stripped of control
+  /// characters, out-of-range optional numbers are dropped.
+  /// Throws [FormatException] when the bill cannot be used.
+  static ExtractedBill fromUntrusted(Map<String, dynamic> json) {
+    final units = _int(json['units']);
+    final total = _double(json['total_due']);
+    final month = _str(json['bill_month']);
+    if (units == null || units < 0 || units > maxUnits) throw const FormatException('units');
+    if (total == null || !total.isFinite || total < 0 || total > maxAmount) throw const FormatException('total_due');
+    if (month == null || monthIndex(month) == null) throw const FormatException('bill_month');
+
+    double? amount(String key) {
+      final v = _double(json[key]);
+      return v != null && v.isFinite && v.abs() <= maxAmount ? v : null;
+    }
+
+    int? reading(String key) {
+      final v = _int(json[key]);
+      return v != null && v >= 0 && v < 1000000000 ? v : null;
+    }
+
+    final dueDate = _str(json['due_date']);
+    final history = <HistoryEntry>[];
+    for (final row in (json['history'] is List ? json['history'] as List : const [])) {
+      if (row is! Map) continue;
+      final h = HistoryEntry.fromJson(Map<String, dynamic>.from(row));
+      if (h == null || monthIndex(h.month) == null || h.units < 0 || h.units > maxUnits) continue;
+      history.add(h);
+      if (history.length == maxHistoryRows) break;
+    }
+
+    return ExtractedBill(
+      disco: _clean(json['disco'], 24),
+      referenceNo: _clean(json['reference_no'], 40),
+      billMonth: month,
+      previousReading: reading('previous_reading'),
+      presentReading: reading('present_reading'),
+      units: units,
+      tariffCategory: _clean(json['tariff_category'], 24),
+      energyCharges: amount('energy_charges'),
+      fixedCharges: amount('fixed_charges'),
+      fpa: amount('fpa'),
+      qtrAdjustment: amount('qtr_adjustment'),
+      gst: amount('gst'),
+      incomeTax: amount('income_tax'),
+      electricityDuty: amount('electricity_duty'),
+      tvFee: amount('tv_fee'),
+      arrears: amount('arrears'),
+      totalDue: total,
+      lateSurcharge: amount('late_surcharge'),
+      dueDate: dueDate != null && isIsoDate(dueDate) ? dueDate : null,
+      history: history,
+      confidence: (_double(json['confidence']) ?? 0).clamp(0.0, 1.0),
+    );
+  }
+
+  static final _controlChars = RegExp(r'[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069]');
+
+  /// Strips control and bidi-override characters, caps length.
+  static String? _clean(Object? v, int maxLength) {
+    final s = _str(v)?.replaceAll(_controlChars, '').trim();
+    if (s == null || s.isEmpty) return null;
+    return s.length <= maxLength ? s : String.fromCharCodes(s.runes.take(maxLength));
+  }
 
   Map<String, dynamic> toJson() => {
         'disco': disco,

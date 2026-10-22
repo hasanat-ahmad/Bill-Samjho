@@ -41,7 +41,7 @@ class TariffConfig {
     if (protectedSlabs.isEmpty || nonProtectedSlabs.isEmpty) {
       throw const FormatException('tariff_config has empty slabs');
     }
-    return TariffConfig(
+    final config = TariffConfig(
       version: json['version'] as String,
       sourceUrl: json['source_url'] as String? ?? '',
       protectedLimitUnits: (json['protected_limit_units'] as num).toInt(),
@@ -55,6 +55,25 @@ class TariffConfig {
       jumpCheckRatio: (json['jump_check_ratio'] as num?)?.toDouble() ?? 1.4,
       jumpWrongRatio: (json['jump_wrong_ratio'] as num?)?.toDouble() ?? 2.0,
     );
+    config._checkRanges();
+    return config;
+  }
+
+  /// Rejects values that would make every verdict wrong, so a mistyped
+  /// Remote Config entry falls back to the previous config.
+  void _checkRanges() {
+    bool ok(num v, num min, num max) => v.isFinite && v >= min && v <= max;
+    final valid = ok(protectedLimitUnits, 1, 2000) &&
+        ok(protectedMonths, 1, 24) &&
+        ok(nearLimitUnits, 0, protectedLimitUnits) &&
+        ok(nonProtectedFlatAboveUnits, 0, 5000) &&
+        ok(energyTolerancePercent, 0, 50) &&
+        ok(historyMonths, 1, 24) &&
+        ok(jumpCheckRatio, 1, 10) &&
+        ok(jumpWrongRatio, jumpCheckRatio, 20) &&
+        [...protectedSlabs, ...nonProtectedSlabs]
+            .every((s) => ok(s.rate, 0.01, 1000) && s.from >= 1 && (s.to == null || s.to! >= s.from));
+    if (!valid) throw const FormatException('tariff_config value out of range');
   }
 
   static List<Slab> _slabs(Object? raw) => (raw as List)
