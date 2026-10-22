@@ -1,23 +1,24 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
-/// Urdu text-to-speech (FR-10). [playing] holds the ID of the text being
-/// spoken so each play button can show its own state.
-class TtsService {
-  static const _language = 'ur-PK';
+import '../core/i18n.dart';
 
+/// Text-to-speech in the app language (FR-10). [playing] holds the ID of the
+/// text being spoken so each play button can show its own state.
+class TtsService {
   final FlutterTts _tts = FlutterTts();
   final ValueNotifier<String?> playing = ValueNotifier(null);
 
-  /// False when the phone has no Urdu voice; the text is still shown.
-  bool urduAvailable = false;
+  /// False when the phone has no voice for the current language; the text
+  /// is always shown anyway.
+  bool voiceAvailable = false;
 
-  Future<void> init({required bool slow}) async {
+  AppLanguage _language = AppLanguage.en;
+  bool _slow = false;
+
+  Future<void> init({required AppLanguage language, required bool slow}) async {
     try {
-      urduAvailable = await _tts.isLanguageAvailable(_language) == true;
-      if (urduAvailable) await _tts.setLanguage(_language);
       await _tts.awaitSpeakCompletion(false);
-      await setSlow(slow);
       void done() => playing.value = null;
       _tts.setCompletionHandler(done);
       _tts.setCancelHandler(done);
@@ -25,9 +26,36 @@ class TtsService {
     } catch (e) {
       debugPrint('TTS init failed: $e');
     }
+    await setLanguage(language);
+    await setSlow(slow);
   }
 
-  Future<void> setSlow(bool slow) => _safely(() => _tts.setSpeechRate(slow ? 0.3 : 0.45));
+  Future<void> setLanguage(AppLanguage language) async {
+    _language = language;
+    voiceAvailable = false;
+    await stop();
+    for (final locale in language.ttsLocales) {
+      try {
+        if (await _tts.isLanguageAvailable(locale) == true) {
+          await _tts.setLanguage(locale);
+          voiceAvailable = true;
+          break;
+        }
+      } catch (e) {
+        debugPrint('TTS language check failed: $e');
+        break;
+      }
+    }
+    // Rate depends on the voice; reapply it.
+    await setSlow(_slow);
+  }
+
+  AppLanguage get language => _language;
+
+  Future<void> setSlow(bool slow) {
+    _slow = slow;
+    return _safely(() => _tts.setSpeechRate(slow ? 0.32 : 0.47));
+  }
 
   Future<void> speak(String id, String text) async {
     playing.value = id;

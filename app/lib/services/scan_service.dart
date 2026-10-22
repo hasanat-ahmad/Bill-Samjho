@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../core/constants.dart';
 
@@ -36,6 +38,8 @@ class ScanService {
       await scanner.close();
     }
   }
+
+  Future<String?> takePhoto() => _pick(ImageSource.camera);
 
   Future<String?> pickFromGallery() => _pick(ImageSource.gallery);
 
@@ -73,6 +77,21 @@ class ScanService {
     }
     if (last == null) throw Exception('Could not read image');
     return last;
+  }
+
+  /// Deletes a temporary photo once it is compressed, so the full-size image
+  /// (with any EXIF location data) does not linger. Only files inside the
+  /// app's own cache are touched, never the user's gallery.
+  Future<void> discard(String path) async {
+    try {
+      final cache = await getTemporaryDirectory();
+      final file = File(path);
+      if (file.absolute.path.startsWith(cache.absolute.path) && await file.exists()) {
+        await file.delete();
+      }
+    } catch (e) {
+      debugPrint('Could not delete temp photo: ${e.runtimeType}');
+    }
   }
 
   static Future<(int, int)> _imageSize(String path) async {
