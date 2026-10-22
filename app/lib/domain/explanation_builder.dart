@@ -1,6 +1,7 @@
 import '../core/i18n.dart';
 import '../data/models/bill.dart';
 import '../data/models/finding.dart';
+import 'forecaster.dart';
 import 'format.dart';
 
 /// Turns findings into the text shown and spoken, in the current language
@@ -66,6 +67,31 @@ class ExplanationBuilder {
       'units': formatNumber(bill.data.units),
       'finding': issues.isEmpty ? '' : findingText(issues.first),
     });
+  }
+
+  /// The next-bill estimate as sentences (shown and spoken).
+  String forecastText(BillForecast f) => [
+        s.template('forecast_summary', {'month': formatMonth(f.month, s), 'units': formatNumber(f.units)}),
+        if (f.amountLow != null && f.amountHigh != null)
+          s.template('forecast_amount', {'low': formatNumber(f.amountLow!), 'high': formatNumber(f.amountHigh!)}),
+        forecastAdvice(f),
+      ].join(' ');
+
+  String forecastBasis(BillForecast f) => switch (f.basis) {
+        ForecastBasis.meterReading => s.template('forecast_basis_meter', {
+            'units': formatNumber(f.meterUnitsSoFar ?? 0),
+            'days': formatNumber(f.meterDays ?? 0),
+          }),
+        ForecastBasis.lastYear => s.template('forecast_basis_last_year'),
+        ForecastBasis.recentMonths => s.template('forecast_basis_recent'),
+        ForecastBasis.thisBill => s.template('forecast_basis_bill'),
+      };
+
+  String forecastAdvice(BillForecast f) {
+    final values = {'limit': formatNumber(f.limit), 'daily': formatNumber(f.dailyBudget)};
+    if (f.overLimit) return s.template('forecast_over', values);
+    if (f.mayCrossLimit) return s.template('forecast_may_cross', values);
+    return s.template('forecast_ok', values);
   }
 
   /// Text under the 200-unit meter (FR-11).
