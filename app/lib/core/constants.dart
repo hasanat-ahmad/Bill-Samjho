@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 /// Build-time settings, passed with --dart-define.
 ///
 /// ```
@@ -11,12 +9,9 @@ class Env {
   static const extractUrl = String.fromEnvironment('EXTRACT_URL');
 
   /// Mock mode returns a sample bill without calling the backend (SDA §12
-  /// step 5). On by default only in debug builds without a backend URL, so a
-  /// release build can never show sample data unless explicitly asked to.
-  static const useMockApi = bool.fromEnvironment(
-    'USE_MOCK_API',
-    defaultValue: !kReleaseMode && extractUrl == '',
-  );
+  /// step 5). Off unless explicitly asked for, so the app never shows sample
+  /// data by accident; the app then shows a "demo mode" banner.
+  static const useMockApi = bool.fromEnvironment('USE_MOCK_API');
 }
 
 class AppConstants {

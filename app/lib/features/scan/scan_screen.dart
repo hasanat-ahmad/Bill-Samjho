@@ -102,10 +102,10 @@ class _ScanAnimationState extends State<_ScanAnimation> with SingleTickerProvide
 
   @override
   Widget build(BuildContext context) {
-    const width = 150.0, height = 190.0;
+    const width = 120.0, height = 150.0;
     return Container(
-      width: 220,
-      height: 220,
+      width: 180,
+      height: 180,
       decoration: const BoxDecoration(color: AppColors.primarySoft, shape: BoxShape.circle),
       alignment: Alignment.center,
       child: SizedBox(
@@ -118,13 +118,13 @@ class _ScanAnimationState extends State<_ScanAnimation> with SingleTickerProvide
               borderRadius: BorderRadius.circular(Radii.md),
               boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.15), blurRadius: 20, offset: const Offset(0, 8))],
             ),
-            padding: const EdgeInsets.all(Gap.lg),
+            padding: const EdgeInsets.all(Gap.md),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.bolt_rounded, color: AppColors.amber, size: 26),
+              const Icon(Icons.bolt_rounded, color: AppColors.amber, size: 20),
               const SizedBox(height: Gap.sm),
-              for (final w in [100.0, 80.0, 110.0, 60.0, 90.0])
+              for (final w in [80.0, 64.0, 90.0, 50.0, 72.0])
                 Container(
-                  margin: const EdgeInsets.only(bottom: 10),
+                  margin: const EdgeInsets.only(bottom: 9),
                   width: w,
                   height: 8,
                   decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(4)),
@@ -216,7 +216,13 @@ class _ErrorView extends StatelessWidget {
               icon: Icons.photo_library_rounded,
               onPressed: () => cubit.start(source: PhotoSource.gallery),
             ),
-          ] else if (error.canRetry)
+          ] else if (error == ApiError.unavailable)
+            PrimaryButton(
+              label: s.t('lookup_entry'),
+              icon: Icons.travel_explore_rounded,
+              onPressed: () => context.pushReplacement('/lookup/${cubit.connectionId}'),
+            )
+          else if (error.canRetry)
             PrimaryButton(label: s.t('try_again'), icon: Icons.refresh_rounded, onPressed: cubit.retry),
           TextButton(onPressed: () => context.pop(), child: Text(s.t('go_back'))),
         ],

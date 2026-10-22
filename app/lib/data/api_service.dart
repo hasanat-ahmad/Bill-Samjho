@@ -49,6 +49,9 @@ abstract class ApiService {
   /// Throws [ApiException].
   Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId, {ProgressCallback? onProgress});
 
+  /// Reads bill data from the text of a bill web page. Throws [ApiException].
+  Future<ExtractedBill> extractBillText(String text, String deviceId);
+
   bool get isMock => false;
 
   /// [appCheckToken] attests the request comes from the genuine app.
@@ -101,17 +104,33 @@ class HttpApiService implements ApiService {
       'deviceId': deviceId,
       'image': MultipartFile.fromBytes(jpeg, filename: 'bill.jpg', contentType: DioMediaType('image', 'jpeg')),
     });
-    final token = await _safeToken();
+    return _post(_uri, form, onProgress: onProgress);
+  }
 
+  /// `extractBillText` lives next to `extractBill`.
+  Uri get _textUri => _uri.replace(
+        pathSegments: [..._uri.pathSegments.take(_uri.pathSegments.length - 1), 'extractBillText'],
+      );
+
+  @override
+  Future<ExtractedBill> extractBillText(String text, String deviceId) async {
+    final network = await _connectivity.checkConnectivity();
+    if (network.every((n) => n == ConnectivityResult.none)) {
+      throw const ApiException(ApiError.offline);
+    }
+    final body = {'deviceId': deviceId, 'text': text.length > 20000 ? text.substring(0, 20000) : text};
+    return _post(_textUri, body);
+  }
+
+  Future<ExtractedBill> _post(Uri uri, Object data, {ProgressCallback? onProgress}) async {
+    final token = await _safeToken();
     try {
       final res = await _dio
           .postUri<Object>(
-            _uri,
-            data: form,
+            uri,
+            data: data,
             options: Options(headers: {'X-Firebase-AppCheck': ?token}),
-            onSendProgress: onProgress == null || form.length <= 0
-                ? null
-                : (sent, total) => onProgress(total > 0 ? sent / total : 0),
+            onSendProgress: onProgress == null ? null : (sent, total) => onProgress(total > 0 ? sent / total : 0),
           )
           .timeout(AppConstants.requestTimeout);
       final body = res.data;
@@ -174,6 +193,10 @@ class UnavailableApiService implements ApiService {
   @override
   Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId, {ProgressCallback? onProgress}) =>
       Future.error(const ApiException(ApiError.unavailable));
+
+  @override
+  Future<ExtractedBill> extractBillText(String text, String deviceId) =>
+      Future.error(const ApiException(ApiError.unavailable));
 }
 
 /// Returns a sample LESCO bill after a short delay, for development
@@ -190,6 +213,12 @@ class MockApiService implements ApiService {
       onProgress?.call(i / 5);
     }
     await Future<void>.delayed(const Duration(milliseconds: 1200));
+    return ExtractedBill.fromUntrusted(sampleBillJson);
+  }
+
+  @override
+  Future<ExtractedBill> extractBillText(String text, String deviceId) async {
+    await Future<void>.delayed(const Duration(milliseconds: 800));
     return ExtractedBill.fromUntrusted(sampleBillJson);
   }
 

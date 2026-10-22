@@ -59,7 +59,7 @@ class _GlossaryScreenState extends State<GlossaryScreen> {
                 _icons[item.icon] ?? Icons.receipt_long_rounded,
                 color: AppColors.primary,
                 background: AppColors.primarySoft,
-                size: 44,
+                size: 36,
               ),
               const SizedBox(width: Gap.md),
               Expanded(
@@ -69,7 +69,7 @@ class _GlossaryScreenState extends State<GlossaryScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: Gap.sm, vertical: 2),
                     decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(6)),
-                    child: Text(item.code, style: numberStyle(18, color: AppColors.inkMuted, weight: FontWeight.w600)),
+                    child: Text(item.code, style: numberStyle(12, color: AppColors.inkMuted, weight: FontWeight.w600)),
                   ),
                   const SizedBox(height: Gap.sm),
                   Text(item.meaning, style: theme.textTheme.bodyMedium),

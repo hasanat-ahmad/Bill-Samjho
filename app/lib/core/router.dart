@@ -3,10 +3,12 @@ import 'package:go_router/go_router.dart';
 
 import '../data/bill_repository.dart';
 import '../data/local_store.dart';
+import '../data/models/extracted_bill.dart';
 import '../features/glossary/glossary_screen.dart';
 import '../features/history/history_cubit.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/lookup/lookup_screen.dart';
 import '../features/onboarding/intro_screen.dart';
 import '../features/result/result_cubit.dart';
 import '../features/result/result_screen.dart';
@@ -33,6 +35,27 @@ GoRouter buildRouter(LocalStore store) => GoRouter(
               scanner: context.read<ScanService>(),
               connectionId: state.pathParameters['connectionId']!,
             )..start(),
+            child: const ScanScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/lookup/:connectionId',
+          builder: (context, state) => LookupScreen(
+            connectionId: state.pathParameters['connectionId']!,
+            openDirectly: state.uri.queryParameters['latest'] == '1',
+          ),
+        ),
+        // Confirm step for a bill read from PITC's website.
+        GoRoute(
+          path: '/confirm/:connectionId',
+          redirect: (context, state) => state.extra is ExtractedBill ? null : '/',
+          builder: (context, state) => BlocProvider(
+            create: (context) => ScanCubit.withBill(
+              repo: context.read<BillRepository>(),
+              scanner: context.read<ScanService>(),
+              connectionId: state.pathParameters['connectionId']!,
+              bill: state.extra! as ExtractedBill,
+            ),
             child: const ScanScreen(),
           ),
         ),

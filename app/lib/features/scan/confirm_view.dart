@@ -15,7 +15,7 @@ class ConfirmView extends StatefulWidget {
   const ConfirmView({super.key, required this.data, required this.jpeg, required this.saving});
 
   final ExtractedBill data;
-  final Uint8List jpeg;
+  final Uint8List? jpeg;
   final bool saving;
 
   @override
@@ -77,8 +77,10 @@ class _ConfirmViewState extends State<ConfirmView> {
                 ]),
               ),
             ],
-            const SizedBox(height: Gap.lg),
-            _PhotoPreview(widget.jpeg),
+            if (widget.jpeg != null) ...[
+              const SizedBox(height: Gap.lg),
+              _PhotoPreview(widget.jpeg!),
+            ],
             const SizedBox(height: Gap.lg),
             _InfoTile(icon: Icons.calendar_month_rounded, label: s.t('month'), value: formatMonth(data.billMonth, s)),
             const SizedBox(height: Gap.md),
@@ -179,7 +181,7 @@ class _PhotoPreview extends StatelessWidget {
           ),
           clipBehavior: Clip.antiAlias,
           child: Stack(children: [
-            Image.memory(jpeg, height: 180, width: double.infinity, fit: BoxFit.cover, alignment: Alignment.topCenter),
+            Image.memory(jpeg, height: 150, width: double.infinity, fit: BoxFit.cover, alignment: Alignment.topCenter),
             PositionedDirectional(
               bottom: Gap.sm,
               end: Gap.sm,
@@ -213,7 +215,7 @@ class _InfoTile extends StatelessWidget {
     return AppCard(
       padding: const EdgeInsets.all(Gap.lg),
       child: Row(children: [
-        IconBadge(icon, color: AppColors.primary, background: AppColors.primarySoft, size: 44),
+        IconBadge(icon, color: AppColors.primary, background: AppColors.primarySoft, size: 36),
         const SizedBox(width: Gap.md),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -255,9 +257,9 @@ class _NumberField extends StatelessWidget {
         keyboardType: TextInputType.numberWithOptions(decimal: allowDecimal),
         inputFormatters: [_WesternDigitsFormatter(allowDecimal: allowDecimal), LengthLimitingTextInputFormatter(10)],
         textDirection: TextDirection.ltr,
-        style: numberStyle(30),
+        style: numberStyle(22),
         decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: AppColors.primary, size: 28),
+          prefixIcon: Icon(icon, color: AppColors.primary, size: 22),
           suffixIcon: const Icon(Icons.edit_rounded, color: AppColors.inkMuted),
         ),
       ),

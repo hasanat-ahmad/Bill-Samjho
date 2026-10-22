@@ -7,6 +7,8 @@ Bill Samjho handles electricity bills, which show a household's name, address an
 | Data | Where | How long |
 |---|---|---|
 | Bill photo | Sent to the backend over HTTPS, read by Gemini in memory | Never stored or logged on the server |
+| Reference number | Sent only to PITC's official site; saved on the phone with the meter | Until the user deletes the meter |
+| Bill page text | Only if the page layout is not recognised: sent to the backend, read in memory | Never stored or logged on the server |
 | Bill numbers, photo copy | On the phone only, encrypted | Until the user deletes them |
 | Random device ID (UUID) | Phone, and as a rate-limit counter key on the server | Server counters expire after 2 days |
 | IP address | Only as an HMAC (keyed hash) in a rate-limit counter | Expires after 2 days |
@@ -21,7 +23,8 @@ No account, phone number, CNIC or location is collected. The app requests no sto
 - **App Check.** Each request carries a Firebase App Check token (Play Integrity), so the backend can reject requests not coming from the genuine app.
 - **Untrusted responses.** Backend data is validated again on the phone: required fields present and in range, text length-capped and stripped of control and bidi-override characters, optional values out of range dropped (`ExtractedBill.fromUntrusted`).
 - **Remote tariffs are range-checked.** A mistyped or malicious Remote Config value is rejected and the previous config stays.
-- **No sample data in release.** Demo mode is off in release builds unless explicitly enabled, and always shows a banner.
+- **PITC lookup in an in-app browser.** It can only load `https://bill.pitc.com.pk` (every other navigation is blocked), adds no JavaScript bridge to the app, and clears PITC cookies and cache when closed. The app pre-fills the reference number but the user taps Search, so PITC's own protections (including any CAPTCHA) stay in place. The bill page is read on the phone; the reference number goes only to PITC.
+- **No sample data by accident.** Demo mode is off unless explicitly enabled with `USE_MOCK_API=true`, and then always shows a banner.
 - **Photo hygiene.** Photos are re-encoded without EXIF (no GPS location); the full-size temporary file is deleted after compression.
 - **No logging in release.** `debugPrint` is disabled; Crashlytics collects only in release and receives stack traces, not bill data.
 - **Input hygiene.** Nicknames are length-limited and stripped of control and bidi characters; number fields accept digits only.

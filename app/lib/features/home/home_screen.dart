@@ -14,9 +14,13 @@ import 'pick_connection_sheet.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  Future<void> _newBill(BuildContext context) async {
-    final connectionId = await showPickConnectionSheet(context);
-    if (connectionId != null && context.mounted) context.push('/scan/$connectionId');
+  Future<void> _newBill(BuildContext context, {bool byReference = false}) async {
+    final connectionId = await showPickConnectionSheet(
+      context,
+      actionIcon: byReference ? Icons.travel_explore_rounded : Icons.photo_camera_rounded,
+    );
+    if (connectionId == null || !context.mounted) return;
+    context.push(byReference ? '/lookup/$connectionId' : '/scan/$connectionId');
   }
 
   @override
@@ -26,7 +30,7 @@ class HomeScreen extends StatelessWidget {
       appBar: AppBar(
         titleSpacing: Gap.page,
         title: Row(children: [
-          const AppLogo(size: 36),
+          const AppLogo(size: 32),
           const SizedBox(width: Gap.md),
           Flexible(child: Text(s.t('app_name'), overflow: TextOverflow.ellipsis)),
         ]),
@@ -62,12 +66,20 @@ class HomeScreen extends StatelessWidget {
       ]),
       bottomNavigationBar: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(Gap.page, Gap.sm, Gap.page, Gap.lg),
-          child: PrimaryButton(
-            label: s.t('scan_bill'),
-            icon: Icons.photo_camera_rounded,
-            onPressed: () => _newBill(context),
-          ),
+          padding: const EdgeInsets.fromLTRB(Gap.page, Gap.sm, Gap.page, Gap.md),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            PrimaryButton(
+              label: s.t('scan_bill'),
+              icon: Icons.photo_camera_rounded,
+              onPressed: () => _newBill(context),
+            ),
+            const SizedBox(height: Gap.sm),
+            SecondaryButton(
+              label: s.t('lookup_entry'),
+              icon: Icons.travel_explore_rounded,
+              onPressed: () => _newBill(context, byReference: true),
+            ),
+          ]),
         ),
       ),
     );
@@ -84,7 +96,7 @@ class _EmptyHome extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(Gap.page, Gap.lg, Gap.page, Gap.xl),
       children: [
-        const BillIllustration(height: 170),
+        const BillIllustration(height: 140),
         const SizedBox(height: Gap.xl),
         Text(s.t('empty_title'), style: theme.textTheme.headlineSmall),
         const SizedBox(height: Gap.xs),
@@ -134,11 +146,11 @@ class _ConnectionCard extends StatelessWidget {
           Text(s.t('no_bill_yet'), style: theme.textTheme.bodyMedium)
         else ...[
           Row(children: [
-            Expanded(child: Text(formatAmount(bill.data.totalDue, s), style: numberStyle(26))),
+            Expanded(child: Text(formatAmount(bill.data.totalDue, s), style: numberStyle(22))),
             VerdictPill(bill.verdict),
           ]),
           const SizedBox(height: Gap.md),
-          UnitMeter(units: bill.data.units, limit: config.protectedLimitUnits, nearLimit: config.nearLimitUnits, height: 10),
+          UnitMeter(units: bill.data.units, limit: config.protectedLimitUnits, nearLimit: config.nearLimitUnits, height: 8),
           const SizedBox(height: Gap.xs),
           Text(
             s.t('units_of_limit', {

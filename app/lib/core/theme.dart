@@ -37,7 +37,7 @@ class Gap {
   static const lg = 16.0;
   static const xl = 24.0;
   static const xxl = 32.0;
-  static const page = 20.0;
+  static const page = 16.0;
 }
 
 class Radii {
@@ -99,20 +99,20 @@ TextTheme _textTheme(AppLanguage lang) {
         letterSpacing: 0,
       );
 
-  // Minimum 18 sp for all text (NFR-03).
+  // Standard Android sizes; Settings → Text size → Large scales them up.
   return TextTheme(
-    displaySmall: style(34, FontWeight.w800, 1.15, 1.6),
-    headlineMedium: style(28, FontWeight.w700, 1.2, 1.7),
-    headlineSmall: style(24, FontWeight.w700, 1.25, 1.75),
-    titleLarge: style(22, FontWeight.w700, 1.3, 1.8),
-    titleMedium: style(20, FontWeight.w600, 1.35, 1.85),
-    titleSmall: style(18, FontWeight.w600, 1.35, 1.9),
-    bodyLarge: style(18, FontWeight.w400, 1.5, 2.0),
-    bodyMedium: style(18, FontWeight.w400, 1.5, 2.0, AppColors.inkMuted),
-    bodySmall: style(18, FontWeight.w400, 1.45, 1.95, AppColors.inkMuted),
-    labelLarge: style(18, FontWeight.w600, 1.25, 1.7),
-    labelMedium: style(18, FontWeight.w600, 1.25, 1.7),
-    labelSmall: style(18, FontWeight.w500, 1.25, 1.7),
+    displaySmall: style(28, FontWeight.w800, 1.15, 1.6),
+    headlineMedium: style(24, FontWeight.w700, 1.2, 1.7),
+    headlineSmall: style(20, FontWeight.w700, 1.25, 1.75),
+    titleLarge: style(19, FontWeight.w700, 1.3, 1.8),
+    titleMedium: style(17, FontWeight.w600, 1.35, 1.85),
+    titleSmall: style(15, FontWeight.w600, 1.35, 1.9),
+    bodyLarge: style(16, FontWeight.w400, 1.45, 2.0),
+    bodyMedium: style(15, FontWeight.w400, 1.45, 2.0, AppColors.inkMuted),
+    bodySmall: style(14, FontWeight.w400, 1.4, 1.95, AppColors.inkMuted),
+    labelLarge: style(15, FontWeight.w600, 1.25, 1.7),
+    labelMedium: style(14, FontWeight.w600, 1.25, 1.7),
+    labelSmall: style(13, FontWeight.w500, 1.25, 1.7),
   );
 }
 
@@ -133,9 +133,9 @@ ThemeData buildTheme(AppLanguage lang) {
     error: AppColors.red,
   );
 
-  const buttonPadding = EdgeInsets.symmetric(horizontal: Gap.xl, vertical: Gap.lg);
+  const buttonPadding = EdgeInsets.symmetric(horizontal: Gap.lg, vertical: Gap.md);
   final buttonShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.md));
-  const minTap = Size(56, 56); // NFR-03 tap targets
+  const minTap = Size(48, 48); // Android minimum tap target
 
   return ThemeData(
     useMaterial3: true,
@@ -155,7 +155,7 @@ ThemeData buildTheme(AppLanguage lang) {
       shadowColor: AppColors.border,
       centerTitle: false,
       titleTextStyle: text.titleLarge,
-      iconTheme: const IconThemeData(color: AppColors.ink, size: 26),
+      iconTheme: const IconThemeData(color: AppColors.ink, size: 24),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(

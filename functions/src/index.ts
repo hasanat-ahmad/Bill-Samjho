@@ -7,7 +7,7 @@ import { FieldValue, Timestamp, getFirestore } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { defineSecret } from "firebase-functions/params";
 import { onRequest, type Request } from "firebase-functions/v2/https";
-import { ApiError, GoogleGenAI } from "@google/genai";
+import { ApiError, GoogleGenAI, type Part } from "@google/genai";
 
 import { BILL_SCHEMA, SYSTEM_PROMPT } from "./schema.js";
 import { validateExtraction } from "./validate.js";
@@ -104,8 +104,22 @@ async function allowRequest(deviceId: string, ip: string): Promise<boolean> {
  * Returns the JSON text, or undefined if every attempt failed.
  */
 async function readBill(models: string[], image: Buffer): Promise<string | undefined> {
+  return askGemini(models, [
+    { inlineData: { mimeType: "image/jpeg", data: image.toString("base64") } },
+    { text: "Read this bill." },
+  ]);
+}
+
+/** Same as [readBill] for the text of a bill web page (PITC duplicate bill). */
+async function readBillText(models: string[], text: string): Promise<string | undefined> {
+  return askGemini(models, [{
+    text: "Read this bill. It is the text of the official PITC duplicate-bill web page, not a photo.\n" +
+      "<bill_page>\n" + text + "\n</bill_page>",
+  }]);
+}
+
+async function askGemini(models: string[], parts: Part[]): Promise<string | undefined> {
   const deadline = Date.now() + GEMINI_BUDGET_MS;
-  const data = image.toString("base64");
   for (const model of models) {
     const remaining = deadline - Date.now();
     if (remaining < 2_000) break;
@@ -113,10 +127,7 @@ async function readBill(models: string[], image: Buffer): Promise<string | undef
       const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY.value(), httpOptions: { timeout: remaining } });
       const response = await ai.models.generateContent({
         model,
-        contents: [{
-          role: "user",
-          parts: [{ inlineData: { mimeType: "image/jpeg", data } }, { text: "Read this bill." }],
-        }],
+        contents: [{ role: "user", parts }],
         config: {
           systemInstruction: SYSTEM_PROMPT,
           temperature: 0,
@@ -135,17 +146,66 @@ async function readBill(models: string[], image: Buffer): Promise<string | undef
   return undefined;
 }
 
+const FUNCTION_OPTIONS = {
+  region: "asia-south1",
+  secrets: [GEMINI_API_KEY, RATE_LIMIT_SECRET],
+  memory: "512MiB" as const,
+  timeoutSeconds: 30,
+  maxInstances: 10,
+  invoker: "public",
+  cors: false,
+};
+
+function geminiModels(): string[] {
+  // Comma-separated, best first; the next is tried when one is overloaded.
+  return (process.env.GEMINI_MODEL ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+}
+
+const MAX_PAGE_TEXT = 20_000;
+
+/**
+ * POST /extractBillText: text of the user's PITC bill page → validated
+ * ExtractedBill JSON. Used only when the app does not recognise a page layout.
+ */
+export const extractBillText = onRequest(FUNCTION_OPTIONS, async (req, res) => {
+  res.set({ "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+  const fail = (status: number, error: string) => { res.status(status).json({ error }); };
+
+  if (req.method !== "POST") return fail(405, "method_not_allowed");
+  if (!(req.header("content-type") ?? "").toLowerCase().startsWith("application/json")) return fail(400, "unreadable");
+  if ((req.rawBody?.length ?? 0) > MAX_PAGE_TEXT * 4 + 1024) return fail(413, "too_large");
+  if (!(await appCheckPasses(req))) return fail(401, "unauthorized");
+
+  const body = req.body as { deviceId?: unknown; text?: unknown } | undefined;
+  const deviceId = typeof body?.deviceId === "string" ? body.deviceId : "";
+  const text = typeof body?.text === "string" ? body.text : "";
+  if (!UUID.test(deviceId)) return fail(400, "unreadable");
+  if (text.trim().length < 50 || text.length > MAX_PAGE_TEXT) return fail(400, "unreadable");
+
+  if (!(await allowRequest(deviceId, req.ip ?? "unknown"))) return fail(429, "rate_limited");
+
+  const models = geminiModels();
+  if (models.length === 0) {
+    logger.error("GEMINI_MODEL is not set");
+    return fail(503, "ai_busy");
+  }
+  const answer = await readBillText(models, text);
+  if (answer === undefined) return fail(503, "ai_busy");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(answer);
+  } catch {
+    return fail(400, "unreadable");
+  }
+  const result = validateExtraction(parsed);
+  if (!result.ok) return fail(400, result.error);
+  res.status(200).json(result.bill);
+});
+
 /** POST /extractBill: bill photo → validated ExtractedBill JSON (SDA §9). */
 export const extractBill = onRequest(
-  {
-    region: "asia-south1",
-    secrets: [GEMINI_API_KEY, RATE_LIMIT_SECRET],
-    memory: "512MiB",
-    timeoutSeconds: 30,
-    maxInstances: 10,
-    invoker: "public",
-    cors: false,
-  },
+  FUNCTION_OPTIONS,
   async (req, res) => {
     res.set({ "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
     const fail = (status: number, error: string) => { res.status(status).json({ error }); };
@@ -172,8 +232,7 @@ export const extractBill = onRequest(
 
     if (!(await allowRequest(upload.deviceId, req.ip ?? "unknown"))) return fail(429, "rate_limited");
 
-    // Comma-separated, best first; the next is tried when one is overloaded.
-    const models = (process.env.GEMINI_MODEL ?? "").split(",").map((m) => m.trim()).filter(Boolean);
+    const models = geminiModels();
     if (models.length === 0) {
       logger.error("GEMINI_MODEL is not set");
       return fail(503, "ai_busy");

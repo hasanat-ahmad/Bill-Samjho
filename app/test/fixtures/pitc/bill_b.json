@@ -1,0 +1,95 @@
+{
+ "text": "PESHAWAR ELECTRIC SUPPLY COMPANY\nREFERENCE NO\t26 13115 0123456 R\tTARIFF\tA-1a(01)\nBILL MONTH\tMar-2026\tDUE DATE\t14-Apr-2026\nMETER NO\tPREVIOUS READING\tPRESENT READING\tMF\tUNITS\nP998877\t5120\t5168\t1\t48\nMONTH\tUNITS\tBILL\tPAYMENT\nMAR 25\t52\t210\t210\nAPR 25\t61\t480\t480\nFEB 26\t45\t180\t500\nUNITS CONSUMED\t48\nCOST OF ELECTRICITY\t189.60\nFIXED CHARGES\t0\nF.P.A\t0\nGST\t34.13\nARREAR/AGE\t-520.00\nPAYABLE WITHIN DUE DATE\t297 CR\nL.P.SURCHARGE\t0",
+ "tables": [
+  [
+   [
+    "REFERENCE NO",
+    "26 13115 0123456 R",
+    "TARIFF",
+    "A-1a(01)"
+   ],
+   [
+    "BILL MONTH",
+    "Mar-2026",
+    "DUE DATE",
+    "14-Apr-2026"
+   ]
+  ],
+  [
+   [
+    "METER NO",
+    "PREVIOUS READING",
+    "PRESENT READING",
+    "MF",
+    "UNITS"
+   ],
+   [
+    "P998877",
+    "5120",
+    "5168",
+    "1",
+    "48"
+   ]
+  ],
+  [
+   [
+    "MONTH",
+    "UNITS",
+    "BILL",
+    "PAYMENT"
+   ],
+   [
+    "MAR 25",
+    "52",
+    "210",
+    "210"
+   ],
+   [
+    "APR 25",
+    "61",
+    "480",
+    "480"
+   ],
+   [
+    "FEB 26",
+    "45",
+    "180",
+    "500"
+   ]
+  ],
+  [
+   [
+    "UNITS CONSUMED",
+    "48"
+   ],
+   [
+    "COST OF ELECTRICITY",
+    "189.60"
+   ],
+   [
+    "FIXED CHARGES",
+    "0"
+   ],
+   [
+    "F.P.A",
+    "0"
+   ],
+   [
+    "GST",
+    "34.13"
+   ],
+   [
+    "ARREAR/AGE",
+    "-520.00"
+   ],
+   [
+    "PAYABLE WITHIN DUE DATE",
+    "297 CR"
+   ],
+   [
+    "L.P.SURCHARGE",
+    "0"
+   ]
+  ]
+ ]
+}

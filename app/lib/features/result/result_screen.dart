@@ -105,7 +105,7 @@ class _ResultScreenState extends State<ResultScreen> {
                   ],
                   const SizedBox(height: Gap.xl),
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Icon(Icons.info_outline_rounded, color: AppColors.inkMuted, size: 22),
+                    const Icon(Icons.info_outline_rounded, color: AppColors.inkMuted, size: 18),
                     const SizedBox(width: Gap.sm),
                     Expanded(child: Text(s.t('advice_only'), style: Theme.of(context).textTheme.bodySmall)),
                   ]),
@@ -135,18 +135,18 @@ class _VerdictHero extends StatelessWidget {
       label: '${builder.verdictLabel(bill.verdict)}. ${builder.verdictSentence(bill.verdict)}',
       excludeSemantics: true,
       child: Container(
-        padding: const EdgeInsets.all(Gap.page),
+        padding: const EdgeInsets.all(Gap.lg),
         decoration: BoxDecoration(
           color: tone.soft,
-          borderRadius: BorderRadius.circular(Radii.xl),
+          borderRadius: BorderRadius.circular(Radii.lg),
           border: Border.all(color: tone.color.withValues(alpha: 0.35)),
         ),
         child: Row(children: [
           Container(
-            width: 64,
-            height: 64,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(color: tone.color, shape: BoxShape.circle),
-            child: Icon(tone.icon, color: Colors.white, size: 40),
+            child: Icon(tone.icon, color: Colors.white, size: 30),
           ),
           const SizedBox(width: Gap.lg),
           Expanded(
@@ -177,7 +177,7 @@ class _AmountCard extends StatelessWidget {
         const SizedBox(height: Gap.xs),
         Text(
           formatAmount(bill.data.totalDue, s),
-          style: numberStyle(40, weight: FontWeight.w800, color: bill.data.isCredit ? AppColors.greenInk : AppColors.ink),
+          style: numberStyle(30, weight: FontWeight.w800, color: bill.data.isCredit ? AppColors.greenInk : AppColors.ink),
         ),
         const SizedBox(height: Gap.md),
         Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
@@ -202,8 +202,8 @@ class _Chip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.xs + 2),
         decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(Radii.sm)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 20, color: AppColors.primary),
-          const SizedBox(width: Gap.xs + 2),
+          Icon(icon, size: 16, color: AppColors.primary),
+          const SizedBox(width: Gap.xs),
           Flexible(child: Text(text, style: Theme.of(context).textTheme.labelMedium)),
         ]),
       );
@@ -221,13 +221,13 @@ class _MeterSection extends StatelessWidget {
     final config = context.read<BillRepository>().tariffConfig;
     final limit = config.protectedLimitUnits;
     final text = ExplanationBuilder(s).meterText(units, limit);
-    final meter = UnitMeter(units: units, limit: limit, nearLimit: config.nearLimitUnits, height: 16, showScale: true);
+    final meter = UnitMeter(units: units, limit: limit, nearLimit: config.nearLimitUnits, height: 12, showScale: true);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       SectionTitle(s.t('meter_title', {'limit': formatNumber(limit)})),
       AppCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            Icon(meter.tone.icon, color: meter.tone.color, size: 28),
+            Icon(meter.tone.icon, color: meter.tone.color, size: 22),
             const SizedBox(width: Gap.sm),
             Expanded(
               child: Text(
@@ -260,7 +260,7 @@ class _FindingCard extends StatelessWidget {
     return AppCard(
       padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.lg, Gap.sm, Gap.lg),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        IconBadge(icon, color: tone.color, background: tone.soft, size: 44),
+        IconBadge(icon, color: tone.color, background: tone.soft, size: 36),
         const SizedBox(width: Gap.md),
         Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyLarge)),
         PlayButton(id: finding.ruleId, text: text, tone: tone),
@@ -311,7 +311,7 @@ class _TtsTip extends StatelessWidget {
       padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.sm, Gap.xs, Gap.lg),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          const Icon(Icons.record_voice_over_rounded, color: AppColors.primaryDark, size: 28),
+          const Icon(Icons.record_voice_over_rounded, color: AppColors.primaryDark, size: 22),
           const SizedBox(width: Gap.md),
           Expanded(child: Text(s.t('tts_tip'), style: Theme.of(context).textTheme.bodyLarge)),
           IconButton(tooltip: s.t('cancel'), icon: const Icon(Icons.close_rounded), onPressed: onClose),

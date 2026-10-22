@@ -47,7 +47,9 @@ class ScanFailed extends ScanState {
 class ScanConfirm extends ScanState {
   const ScanConfirm(this.data, this.jpeg, {this.saving = false});
   final ExtractedBill data;
-  final Uint8List jpeg;
+
+  /// Null when the bill came from PITC's website.
+  final Uint8List? jpeg;
   final bool saving;
 }
 
@@ -63,6 +65,12 @@ class ScanCubit extends Cubit<ScanState> {
         _scanner = scanner,
         super(const ScanOpening());
 
+  /// Starts at the confirm step with a bill read from PITC's website.
+  ScanCubit.withBill({required BillRepository repo, required ScanService scanner, required this.connectionId, required ExtractedBill bill})
+      : _repo = repo,
+        _scanner = scanner,
+        super(ScanConfirm(bill, null));
+
   final BillRepository _repo;
   final ScanService _scanner;
   final String connectionId;
@@ -73,6 +81,11 @@ class ScanCubit extends Cubit<ScanState> {
   int _attempt = 0;
 
   Future<void> start({PhotoSource source = PhotoSource.scanner}) async {
+    // Say so before the camera opens, not after the user took a photo.
+    if (!_repo.canScanPhotos) {
+      _emit(const ScanFailed(ApiError.unavailable));
+      return;
+    }
     _emit(const ScanOpening());
     final String? path;
     try {

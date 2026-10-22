@@ -10,6 +10,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/bill_repository.dart';
 import '../../data/models/bill.dart';
+import '../../data/pitc/pitc.dart';
 import '../../domain/format.dart';
 import 'history_cubit.dart';
 
@@ -67,6 +68,26 @@ class HistoryScreen extends StatelessWidget {
                           Expanded(child: Text(details, style: theme.textTheme.bodySmall, textDirection: TextDirection.ltr)),
                         ]),
                       ),
+                    if (connection?.referenceNo != null && Disco.find(connection?.disco) != null) ...[
+                      const SizedBox(height: Gap.lg),
+                      AppCard(
+                        color: AppColors.primarySoft,
+                        borderColor: AppColors.primarySoft,
+                        padding: const EdgeInsets.all(Gap.lg),
+                        onTap: () => context.push('/lookup/${connection!.id}?latest=1'),
+                        child: Row(children: [
+                          const IconBadge(Icons.travel_explore_rounded, color: AppColors.primary, background: Colors.white),
+                          const SizedBox(width: Gap.md),
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(s.t('get_latest'), style: theme.textTheme.titleMedium?.copyWith(color: AppColors.primaryDark)),
+                              Text(s.t('get_latest_hint'), style: theme.textTheme.bodySmall),
+                            ]),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: AppColors.primaryDark),
+                        ]),
+                      ),
+                    ],
                     if (state.chart.isNotEmpty) ...[
                       SectionTitle(s.t('chart_title')),
                       AppCard(

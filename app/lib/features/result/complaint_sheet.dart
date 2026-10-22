@@ -123,9 +123,9 @@ class _ActionTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(Radii.md),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: Gap.lg, horizontal: Gap.xs),
+          padding: const EdgeInsets.symmetric(vertical: Gap.md, horizontal: Gap.xs),
           child: Column(children: [
-            Icon(icon, color: color, size: 30),
+            Icon(icon, color: color, size: 24),
             const SizedBox(height: Gap.sm),
             Text(label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color)),
           ]),

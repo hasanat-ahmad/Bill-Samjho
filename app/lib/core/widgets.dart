@@ -15,7 +15,7 @@ double bottomPadding(BuildContext context, [double base = Gap.xxl]) => base + Me
 
 /// App mark: a bill with a lightning bolt.
 class AppLogo extends StatelessWidget {
-  const AppLogo({super.key, this.size = 48});
+  const AppLogo({super.key, this.size = 40});
 
   final double size;
 
@@ -91,7 +91,7 @@ class SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: Gap.xl, bottom: Gap.md),
+      padding: const EdgeInsets.only(top: Gap.lg + Gap.xs, bottom: Gap.sm + 2),
       child: Row(children: [
         Expanded(child: Text(text, style: Theme.of(context).textTheme.titleLarge)),
         ?trailing,
@@ -102,7 +102,7 @@ class SectionTitle extends StatelessWidget {
 
 /// Rounded square with a tinted background and an icon.
 class IconBadge extends StatelessWidget {
-  const IconBadge(this.icon, {super.key, required this.color, required this.background, this.size = 48});
+  const IconBadge(this.icon, {super.key, required this.color, required this.background, this.size = 40});
 
   final IconData icon;
   final Color color;
@@ -137,8 +137,8 @@ class VerdictPill extends StatelessWidget {
         padding: const EdgeInsetsDirectional.fromSTEB(Gap.sm, Gap.xs, Gap.md, Gap.xs),
         decoration: BoxDecoration(color: tone.soft, borderRadius: BorderRadius.circular(999)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(tone.icon, color: tone.color, size: 22),
-          const SizedBox(width: Gap.xs + 2),
+          Icon(tone.icon, color: tone.color, size: 18),
+          const SizedBox(width: Gap.xs),
           Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: tone.ink)),
         ]),
       ),
@@ -160,13 +160,13 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = FilledButton.styleFrom(
       backgroundColor: color,
-      minimumSize: const Size.fromHeight(60),
+      minimumSize: const Size.fromHeight(52),
     );
     final iconWidget = busy
-        ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+        ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
         : icon == null
             ? null
-            : Icon(icon, size: 26);
+            : Icon(icon, size: 22);
     final onTap = busy || onPressed == null
         ? null
         : () {
@@ -189,10 +189,10 @@ class SecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(58));
+    final style = OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50));
     return icon == null
         ? OutlinedButton(style: style, onPressed: onPressed, child: Text(label, textAlign: TextAlign.center))
-        : OutlinedButton.icon(style: style, onPressed: onPressed, icon: Icon(icon, size: 24), label: Text(label, textAlign: TextAlign.center));
+        : OutlinedButton.icon(style: style, onPressed: onPressed, icon: Icon(icon, size: 20), label: Text(label, textAlign: TextAlign.center));
   }
 }
 
@@ -215,7 +215,7 @@ class PlayButton extends StatelessWidget {
         return IconButton.filledTonal(
           tooltip: isPlaying ? s.t('stop') : s.t('listen'),
           style: IconButton.styleFrom(backgroundColor: tone.soft, foregroundColor: tone.ink),
-          iconSize: 28,
+          iconSize: 22,
           icon: Icon(isPlaying ? Icons.stop_rounded : Icons.volume_up_rounded),
           onPressed: () => tts.toggle(id, text),
         );
@@ -248,17 +248,17 @@ class ListenButton extends StatelessWidget {
           child: AppCard(
             color: AppColors.primarySoft,
             borderColor: AppColors.primarySoft,
-            padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: Gap.md),
+            padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.sm),
             onTap: () {
               HapticFeedback.selectionClick();
               tts.toggle(id, text);
             },
             child: Row(children: [
               Container(
-                width: 52,
-                height: 52,
+                width: 42,
+                height: 42,
                 decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                child: Icon(isPlaying ? Icons.stop_rounded : Icons.volume_up_rounded, color: Colors.white, size: 30),
+                child: Icon(isPlaying ? Icons.stop_rounded : Icons.volume_up_rounded, color: Colors.white, size: 24),
               ),
               const SizedBox(width: Gap.lg),
               Expanded(
@@ -321,7 +321,7 @@ class UnitMeter extends StatelessWidget {
     required this.units,
     required this.limit,
     required this.nearLimit,
-    this.height = 14,
+    this.height = 12,
     this.showScale = false,
   });
 
@@ -364,7 +364,7 @@ class UnitMeter extends StatelessWidget {
       ),
     );
     if (!showScale) return bar;
-    final scaleStyle = numberStyle(18, color: AppColors.inkMuted, weight: FontWeight.w500);
+    final scaleStyle = numberStyle(13, color: AppColors.inkMuted, weight: FontWeight.w500);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       bar,
       const SizedBox(height: Gap.xs),
@@ -404,10 +404,10 @@ class MessageView extends StatelessWidget {
           constraints: BoxConstraints(minHeight: constraints.maxHeight - Gap.xl * 2),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Container(
-              width: 112,
-              height: 112,
+              width: 88,
+              height: 88,
               decoration: BoxDecoration(color: tone.soft, shape: BoxShape.circle),
-              child: Icon(icon, size: 56, color: tone.color),
+              child: Icon(icon, size: 44, color: tone.color),
             ),
             const SizedBox(height: Gap.xl),
             Text(title, style: theme.textTheme.headlineSmall, textAlign: TextAlign.center),
@@ -436,7 +436,7 @@ class DemoBanner extends StatelessWidget {
       color: AppColors.amberSoft,
       padding: const EdgeInsets.symmetric(horizontal: Gap.page, vertical: Gap.sm),
       child: Row(children: [
-        const Icon(Icons.science_rounded, color: AppColors.amberInk, size: 22),
+        const Icon(Icons.science_rounded, color: AppColors.amberInk, size: 18),
         const SizedBox(width: Gap.sm),
         Expanded(
           child: Text(context.s.t('demo_banner'),
@@ -484,11 +484,11 @@ class LanguageSwitch extends StatelessWidget {
       segments: const [
         ButtonSegment(
           value: AppLanguage.en,
-          label: Text('English', style: TextStyle(fontFamily: 'Roboto', fontSize: 18, fontWeight: FontWeight.w600)),
+          label: Text('English', style: TextStyle(fontFamily: 'Roboto', fontSize: 15, fontWeight: FontWeight.w600)),
         ),
         ButtonSegment(
           value: AppLanguage.ur,
-          label: Text('اردو', style: TextStyle(fontFamily: 'NotoNastaliqUrdu', fontSize: 18)),
+          label: Text('اردو', style: TextStyle(fontFamily: 'NotoNastaliqUrdu', fontSize: 15)),
         ),
       ],
       selected: {value},
@@ -502,7 +502,7 @@ class LanguageSwitch extends StatelessWidget {
 
 /// Illustration: a bill with a tick and a speaker, used on intro and empty home.
 class BillIllustration extends StatelessWidget {
-  const BillIllustration({super.key, this.height = 190});
+  const BillIllustration({super.key, this.height = 150});
 
   final double height;
 
@@ -529,14 +529,14 @@ class BillIllustration extends StatelessWidget {
       ),
       child: Center(
         child: SizedBox(
-          width: 210,
+          width: 180,
           height: height * 0.78,
           child: Stack(clipBehavior: Clip.none, children: [
             Positioned.fill(
               child: Transform.rotate(
                 angle: -0.05,
                 child: Container(
-                  padding: const EdgeInsets.all(Gap.lg),
+                  padding: const EdgeInsets.all(Gap.md),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(Radii.md),
@@ -544,18 +544,18 @@ class BillIllustration extends StatelessWidget {
                   ),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
-                      const Icon(Icons.bolt_rounded, color: AppColors.amber, size: 22),
+                      const Icon(Icons.bolt_rounded, color: AppColors.amber, size: 18),
                       const SizedBox(width: 6),
-                      Container(width: 70, height: 10, decoration: line),
+                      Container(width: 60, height: 8, decoration: line),
                     ]),
-                    const SizedBox(height: Gap.md),
-                    Container(width: 140, height: 8, decoration: line),
                     const SizedBox(height: Gap.sm),
-                    Container(width: 110, height: 8, decoration: line),
+                    Container(width: 120, height: 7, decoration: line),
+                    const SizedBox(height: Gap.sm),
+                    Container(width: 90, height: 7, decoration: line),
                     const Spacer(),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: Text('Rs 5,867', style: numberStyle(22, color: AppColors.primaryDark)),
+                      child: Text('Rs 5,867', style: numberStyle(18, color: AppColors.primaryDark)),
                     ),
                   ]),
                 ),
@@ -586,14 +586,14 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: 52,
-        height: 52,
+        width: 42,
+        height: 42,
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 4),
+          border: Border.all(color: Colors.white, width: 3),
         ),
-        child: Icon(icon, color: Colors.white, size: 26),
+        child: Icon(icon, color: Colors.white, size: 20),
       );
 }
 
@@ -608,19 +608,19 @@ class StepRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Gap.sm),
+      padding: const EdgeInsets.symmetric(vertical: Gap.xs + 2),
       child: Row(children: [
         Stack(clipBehavior: Clip.none, children: [
-          IconBadge(icon, color: AppColors.primary, background: AppColors.primarySoft, size: 52),
+          IconBadge(icon, color: AppColors.primary, background: AppColors.primarySoft, size: 40),
           PositionedDirectional(
-            top: -6,
-            start: -6,
+            top: -5,
+            start: -5,
             child: Container(
-              width: 24,
-              height: 24,
+              width: 20,
+              height: 20,
               alignment: Alignment.center,
               decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-              child: Text('$number', style: numberStyle(13, color: Colors.white)),
+              child: Text('$number', style: numberStyle(11, color: Colors.white)),
             ),
           ),
         ]),

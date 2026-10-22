@@ -178,6 +178,9 @@ void main() {
     await tester.tap(find.text('Shop'));
     await tester.pumpAndSettle();
     expect(find.text('Units per month'), findsOneWidget);
+    // The sample bill has a LESCO reference number, so the lookup shortcut shows.
+    expect(find.text('Get latest bill'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('September 2026'), 300);
     expect(find.text('September 2026'), findsOneWidget);
 
     await tester.tap(find.text('September 2026'));
@@ -195,7 +198,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.text('Version 1.0.0'), 300);
     expect(find.text('Version 1.0.0'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Large'), -300);
+    await tester.ensureVisible(find.text('Large'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Large'));
     await tester.pumpAndSettle();
     expect(store.setting<bool>(SettingKeys.largeText), isTrue);
@@ -218,5 +222,47 @@ void main() {
     final urduSummary = find.textContaining('اس مہینے آپ نے 186 یونٹ');
     await tester.scrollUntilVisible(urduSummary, 300);
     expect(urduSummary, findsOneWidget);
+  });
+
+  testWidgets('reference-number lookup form: validation, saved number, both languages', (tester) async {
+    await tester.runAsync(() async {
+      await store.setSetting(SettingKeys.onboardingDone, true);
+    });
+    await pumpApp(tester);
+
+    await tester.tap(find.text('Get bill by reference number'));
+    await tester.pumpAndSettle();
+    await tapAsync(tester, find.text('Home'));
+    expect(find.text('Find your bill online'), findsOneWidget);
+    expect(find.text('PESCO'), findsOneWidget);
+    expect(find.text('HAZECO'), findsOneWidget);
+
+    // Too few digits → clear message, browser not opened.
+    await tester.tap(find.text('PESCO'));
+    final page = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(find.byType(TextField), 200, scrollable: page);
+    await tester.enterText(find.byType(TextField), '0711234');
+    await tester.scrollUntilVisible(find.text('Open my bill'), 200, scrollable: page);
+    await tester.tap(find.text('Open my bill'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter all 14 digits of your reference number.'), findsOneWidget);
+
+    // Urdu digits are accepted and grouped like the printed bill.
+    await tester.enterText(find.byType(TextField), '۰۷۱۱۲۳۴۱۲۳۴۵۶۷');
+    await tester.pump();
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, '07 11234 1234567');
+
+    // Same form in Urdu with large text must lay out on a small phone.
+    await tester.runAsync(() async {
+      await store.setSetting(SettingKeys.language, 'ur');
+      await store.setSetting(SettingKeys.largeText, true);
+    });
+    // Restart the app, as after closing it.
+    await tester.pumpWidget(const SizedBox());
+    await pumpApp(tester);
+    await tester.tap(find.text('ریفرنس نمبر سے بل دیکھیں'));
+    await tester.pumpAndSettle();
+    await tapAsync(tester, find.text('Home').last); // the meter in the sheet
+    expect(find.text('اپنا بل آن لائن دیکھیں'), findsOneWidget);
   });
 }

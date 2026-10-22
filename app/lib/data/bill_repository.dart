@@ -37,6 +37,9 @@ class BillRepository {
   /// True when bills come from the sample data, not the real backend.
   bool get isDemo => _api.isMock;
 
+  /// False until the photo-reading backend is configured for this build.
+  bool get canScanPhotos => _api is! UnavailableApiService;
+
   /// Fires after any connection or bill is added or deleted.
   Stream<void> get changes => _changes.stream;
 
@@ -82,6 +85,24 @@ class BillRepository {
     _changes.add(null);
   }
 
+  /// Remembers the meter's reference number and company for next time.
+  Future<void> saveReference(String connectionId, {required String referenceNo, required String disco}) async {
+    final c = _store.connection(connectionId);
+    if (c == null) return;
+    await _store.saveConnection(Connection(
+      id: c.id,
+      nickname: c.nickname,
+      disco: disco,
+      referenceNo: referenceNo,
+      createdAt: c.createdAt,
+    ));
+    _changes.add(null);
+  }
+
+  /// Reads a bill page's text with the AI backend, when a PITC page layout
+  /// is not recognised. Throws [ApiException].
+  Future<ExtractedBill> extractText(String text) => _api.extractBillText(text, deviceId);
+
   // ---- Bills ----
 
   /// Newest month first.
@@ -100,10 +121,11 @@ class BillRepository {
 
   /// Runs the rules engine on the (possibly user-corrected) [data], then saves
   /// the bill and its image. A rescan of the same month replaces the old bill.
+  /// [jpeg] is null for bills read from PITC's website (no photo).
   Future<Bill> analyseAndSave({
     required String connectionId,
     required ExtractedBill data,
-    required Uint8List jpeg,
+    Uint8List? jpeg,
   }) async {
     final existing = billsFor(connectionId);
     for (final old in existing.where((b) => b.data.billMonth == data.billMonth)) {
@@ -113,9 +135,13 @@ class BillRepository {
     final result = RulesEngine(_tariffConfig()).evaluate(data, past);
 
     final id = _uuid.v4();
-    await _imagesDir.create(recursive: true);
-    final image = File('${_imagesDir.path}/$id.jpg');
-    await image.writeAsBytes(jpeg, flush: true);
+    var imagePath = '';
+    if (jpeg != null) {
+      await _imagesDir.create(recursive: true);
+      final image = File('${_imagesDir.path}/$id.jpg');
+      await image.writeAsBytes(jpeg, flush: true);
+      imagePath = image.path;
+    }
 
     final bill = Bill(
       id: id,
@@ -123,7 +149,7 @@ class BillRepository {
       data: data,
       verdict: result.verdict,
       findings: result.findings,
-      imagePath: image.path,
+      imagePath: imagePath,
       createdAt: DateTime.now(),
     );
     await _store.saveBill(bill);
@@ -139,8 +165,10 @@ class BillRepository {
   Future<void> deleteBill(String id) async {
     final b = _store.bill(id);
     if (b == null) return;
-    final image = File(b.imagePath);
-    if (await image.exists()) await image.delete();
+    if (b.imagePath.isNotEmpty) {
+      final image = File(b.imagePath);
+      if (await image.exists()) await image.delete();
+    }
     await _store.deleteBill(id);
     _changes.add(null);
   }

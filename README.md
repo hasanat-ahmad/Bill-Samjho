@@ -10,6 +10,11 @@ functions/   Firebase Cloud Function `extractBill` (TypeScript, Gemini)
 firebase.json, firestore.rules
 ```
 
+Two ways to get a bill:
+
+1. **Reference number (WAPDA companies):** the app opens the user's bill on PITC's official duplicate-bill website (`bill.pitc.com.pk`) inside the app, with the 14-digit reference number filled in. The user taps *Search* on the official page (and answers any CAPTCHA PITC shows); the app never submits the form or works around PITC's protections. Once the bill is showing, *Explain this bill* reads it on the phone (`assets/pitc/read_bill.js` + `PitcBillParser`). No AI and no backend are needed; if a page layout is not recognised, the page text is sent to the `extractBillText` function instead. The reference number is saved on the meter, so *Get latest bill* is one tap next month. Supported: LESCO, IESCO, FESCO, GEPCO, MEPCO, PESCO, HESCO, SEPCO, QESCO, TESCO, HAZECO. K-Electric bills are not on PITC; use a photo.
+2. **Photo:** the bill photo is read by Gemini through the `extractBill` function.
+
 **Key principle:** AI only reads the image. The rules engine on the phone makes every judgement and fills every number into fixed templates.
 
 ## Changes from the SRS
@@ -18,16 +23,19 @@ firebase.json, firestore.rules
 |---|---|---|
 | NFR-02: UI in Urdu | English by default; English/اردو switch on the first screen and in Settings. Urdu is fully right-to-left with Noto Nastaliq. | Product owner decision. |
 | §8 `Finding.urduText` | `Finding.params` (raw values); text is built when shown | A saved bill is explained in whichever language is chosen later. |
+| NFR-03: minimum text 18 sp, tap targets 56 dp | Standard Android sizes (body 15–16 sp, tap targets ≥ 48 dp); Settings → Text size → Large enlarges everything | Product owner found the large UI too big. |
+| §1.2 out of scope: fetching bills by reference number | In scope: opens the bill on PITC's official site in the app and reads it | Product owner decision. |
 | §10.3 `urdu_strings.json` | `assets/i18n/en.json` and `ur.json` (UI labels, templates, errors, glossary) | Two languages; a test checks both files have the same keys and placeholders. |
 
 ## Run the app
 
-Debug builds without a backend URL run in **demo mode**: a sample LESCO bill, with a banner saying so.
+The reference-number lookup works without any backend. Photo scanning needs `EXTRACT_URL`; without it, scanning says it is not available. Sample data appears only with `--dart-define=USE_MOCK_API=true`, always with a "demo mode" banner.
 
 ```sh
 cd app
 flutter pub get
-flutter run                                   # demo mode (debug only)
+flutter run                                   # lookup works; photo scanning needs EXTRACT_URL
+flutter run --dart-define=USE_MOCK_API=true   # sample bill, for UI work only
 flutter test                                  # rules engine, security, i18n and UI flow tests
 ```
 

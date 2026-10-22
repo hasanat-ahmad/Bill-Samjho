@@ -9,7 +9,9 @@ import '../../data/bill_repository.dart';
 
 /// S3: choose which meter the bill is for, or add one (FR-02).
 /// Returns the connection ID, or null if dismissed.
-Future<String?> showPickConnectionSheet(BuildContext context) => showModalBottomSheet<String>(
+/// [actionIcon] shows what happens after picking (camera or web lookup).
+Future<String?> showPickConnectionSheet(BuildContext context, {IconData actionIcon = Icons.photo_camera_rounded}) =>
+    showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -18,12 +20,14 @@ Future<String?> showPickConnectionSheet(BuildContext context) => showModalBottom
           RepositoryProvider.value(value: context.read<BillRepository>()),
           RepositoryProvider.value(value: context.read<AppStrings>()),
         ],
-        child: const _PickConnectionSheet(),
+        child: _PickConnectionSheet(actionIcon: actionIcon),
       ),
     );
 
 class _PickConnectionSheet extends StatefulWidget {
-  const _PickConnectionSheet();
+  const _PickConnectionSheet({required this.actionIcon});
+
+  final IconData actionIcon;
 
   @override
   State<_PickConnectionSheet> createState() => _PickConnectionSheetState();
@@ -72,7 +76,7 @@ class _PickConnectionSheetState extends State<_PickConnectionSheet> {
                     const IconBadge(Icons.home_rounded, color: AppColors.primary, background: AppColors.primarySoft),
                     const SizedBox(width: Gap.md),
                     Expanded(child: Text(c.nickname, style: theme.textTheme.titleMedium)),
-                    const Icon(Icons.photo_camera_rounded, color: AppColors.primary),
+                    Icon(widget.actionIcon, color: AppColors.primary),
                   ]),
                 ),
               ),

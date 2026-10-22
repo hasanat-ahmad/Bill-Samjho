@@ -33,7 +33,7 @@ class IntroScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(Gap.page, Gap.lg, Gap.page, Gap.lg),
               children: [
                 Row(children: [
-                  const AppLogo(size: 40),
+                  const AppLogo(size: 34),
                   const SizedBox(width: Gap.md),
                   Expanded(child: Text(s.t('app_name'), style: theme.textTheme.titleLarge)),
                 ]),
