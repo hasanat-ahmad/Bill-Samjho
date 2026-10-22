@@ -55,6 +55,7 @@ class PitcBillParser {
       'previous_reading': find(const ['PREVIOUS READING', 'PREVIOUS'], _int),
       'present_reading': find(const ['PRESENT READING', 'PRESENT'], _int),
       'tariff_category': find(const ['TARIFF'], _text),
+      'protected_consumer': find(const ['CATEGORY', 'CONSUMER CATEGORY'], _category),
       // Only the classic "Cost of Electricity" line is the energy charge.
       // The 2026 layout's "Total Electricity Charges" includes other items,
       // so it is deliberately not used for the energy check.
@@ -129,6 +130,12 @@ class PitcBillParser {
   static Object? _reference(String s) {
     final digits = s.replaceAll(RegExp(r'[^0-9]'), '');
     return digits.length == 14 ? s.trim() : null;
+  }
+
+  /// "Protected" / "Unprotected" / "Non-Protected" as printed.
+  static Object? _category(String s) {
+    final t = s.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
+    return switch (t) { 'PROTECTED' => true, 'UNPROTECTED' || 'NONPROTECTED' => false, _ => null };
   }
 
   /// Short Latin text such as a tariff code ("A-1A(01)"); not an Urdu label.

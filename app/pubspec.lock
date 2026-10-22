@@ -201,6 +201,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.9.3+6"
+  firebase_ai:
+    dependency: "direct main"
+    description:
+      name: firebase_ai
+      sha256: bcc69b0ad09ac40cc2ad35a752e8a81aff22e0c2cb66dc51ccf353762de6a768
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.0.0"
   firebase_app_check:
     dependency: "direct main"
     description:
@@ -225,6 +233,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.0+2"
+  firebase_auth:
+    dependency: transitive
+    description:
+      name: firebase_auth
+      sha256: "76ddb00b0e74fbaf508b283a8da7f473ef5f7305bd63b792dc7c8891d1ba034f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.0"
+  firebase_auth_platform_interface:
+    dependency: transitive
+    description:
+      name: firebase_auth_platform_interface
+      sha256: f7eab35271d4c3594137f10665cf98e9b401921145272f14973a5a4a92183946
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.1.1"
+  firebase_auth_web:
+    dependency: transitive
+    description:
+      name: firebase_auth_web
+      sha256: "68b9c91ccb7557ab10f1a74035227f2a1627a04deebfe9eedf33054a9446ab3c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.3.1"
   firebase_core:
     dependency: "direct main"
     description:
@@ -1018,6 +1050,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
+  web_socket:
+    dependency: transitive
+    description:
+      name: web_socket
+      sha256: "34d64019aa8e36bf9842ac014bb5d2f5586ca73df5e4d9bf5c936975cae6982c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
+  web_socket_channel:
+    dependency: transitive
+    description:
+      name: web_socket_channel
+      sha256: d645757fb0f4773d602444000a8131ff5d48c9e47adfe9772652dd1a4f2d45c8
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.3"
   webview_flutter:
     dependency: "direct main"
     description:

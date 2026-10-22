@@ -202,7 +202,15 @@ class RulesEngine {
       }
     }
     final overNow = b.units > limit;
-    if (!overNow && lastOver == null) return null;
+    if (!overNow && lastOver == null) {
+      // No history evidence, but the bill itself may say "Unprotected".
+      if (b.protectedConsumer != false) return null;
+      return Finding(
+        ruleId: 'R4',
+        severity: Severity.check,
+        params: {'limit': '$limit', 'months': '${config.protectedMonths}', 'source': 'bill'},
+      );
+    }
     if (overNow && currentIndex != null) lastOver = currentIndex;
 
     return Finding(

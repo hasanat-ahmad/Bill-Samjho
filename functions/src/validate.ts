@@ -96,6 +96,7 @@ export function validateExtraction(raw: unknown): ValidationResult {
   for (const f of STRING_FIELDS) bill[f] = toStr(r[f], STRING_LIMITS[f]);
   for (const f of NUMBER_FIELDS) bill[f] = toAmount(r[f]);
   bill.bill_month = billMonth;
+  bill.protected_consumer = typeof r.protected_consumer === "boolean" ? r.protected_consumer : null;
   if (typeof bill.due_date === "string" && !DATE.test(bill.due_date)) bill.due_date = null;
 
   const history = Array.isArray(r.history) ? r.history : [];

@@ -36,6 +36,7 @@ class ExplanationBuilder {
       }
       return s.template(values.containsKey('due_date') ? 'summary' : 'summary_no_due_date', values);
     }
+    if (f.ruleId == 'R4' && f.params['source'] == 'bill') return s.template('r4_from_bill', values);
     var text = s.template(_templateFor[f.ruleId] ?? f.ruleId, values);
     if (f.ruleId == 'R4' && values.containsKey('return_month')) {
       text += ' ${s.template('r4_return_month', {'month': values['return_month']!})}';

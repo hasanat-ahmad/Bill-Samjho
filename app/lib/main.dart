@@ -13,6 +13,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
+import 'core/constants.dart';
 import 'core/i18n.dart';
 import 'data/api_service.dart';
 import 'data/bill_repository.dart';
@@ -55,7 +56,10 @@ Future<void> main() async {
   final docs = await getApplicationDocumentsDirectory();
   final repo = BillRepository(
     store: store,
-    api: ApiService.create(appCheckToken: firebaseReady ? () => FirebaseAppCheck.instance.getToken() : null),
+    api: ApiService.create(
+      firebaseReady: firebaseReady,
+      appCheckToken: firebaseReady && Env.appCheck ? () => FirebaseAppCheck.instance.getToken() : null,
+    ),
     tariffConfig: () => tariffs.config,
     imagesDir: Directory('${docs.path}/bills'),
   );
@@ -94,9 +98,13 @@ Future<void> _openStore(LocalStore store) async {
 Future<bool> _initFirebase() async {
   try {
     await Firebase.initializeApp();
-    await FirebaseAppCheck.instance.activate(
-      providerAndroid: kReleaseMode ? const AndroidPlayIntegrityProvider() : const AndroidDebugProvider(),
-    );
+    // Only touch App Check when enabled: once created it is attached to
+    // every Firebase AI request, and sideloaded APKs cannot pass it.
+    if (Env.appCheck) {
+      await FirebaseAppCheck.instance.activate(
+        providerAndroid: kReleaseMode ? const AndroidPlayIntegrityProvider() : const AndroidDebugProvider(),
+      );
+    }
     final crashlytics = FirebaseCrashlytics.instance;
     await crashlytics.setCrashlyticsCollectionEnabled(kReleaseMode);
     FlutterError.onError = crashlytics.recordFlutterFatalError;

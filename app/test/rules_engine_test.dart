@@ -206,6 +206,16 @@ void main() {
       expect(finding(bill(units: 150, history: history), 'R4').params['return_month'], '2026-11');
     });
 
+    test('fires from the bill\'s own "Unprotected" category without history', () {
+      final unprotected = ExtractedBill(billMonth: '2026-09', units: 106, totalDue: 4367, protectedConsumer: false);
+      final f = finding(unprotected, 'R4');
+      expect(f.params['source'], 'bill');
+      expect(en.findingText(f), contains('unprotected consumer'));
+      expect(ur.findingText(f), contains('Unprotected'));
+      final protected = ExtractedBill(billMonth: '2026-09', units: 106, totalDue: 4367, protectedConsumer: true);
+      expect(rulesFired(protected), isNot(contains('R4')));
+    });
+
     test('does not fire at exactly 200 or for months older than 6', () {
       expect(rulesFired(bill(units: 200)), isNot(contains('R4')));
       final history = [HistoryEntry(month: '2026-02', units: 300)];

@@ -23,6 +23,15 @@ test("accepts a good bill and keeps only known fields", () => {
   assert.equal("is_electricity_bill" in r.bill, false);
 });
 
+test("protected category passes through only as a boolean", () => {
+  const a = validateExtraction({ ...good, protected_consumer: false });
+  assert.ok(a.ok);
+  assert.equal(a.bill.protected_consumer, false);
+  const b = validateExtraction({ ...good, protected_consumer: "yes" });
+  assert.ok(b.ok);
+  assert.equal(b.bill.protected_consumer, null);
+});
+
 test("not a bill", () => {
   assert.deepEqual(validateExtraction({ ...good, is_electricity_bill: false }), { ok: false, error: "not_a_bill" });
 });

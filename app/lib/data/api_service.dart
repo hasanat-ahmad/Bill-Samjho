@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/constants.dart';
+import 'firebase_ai_api_service.dart';
 import 'models/extracted_bill.dart';
 
 /// Error codes match the backend (SDA §9.1) and the `errors` keys in
@@ -54,14 +55,21 @@ abstract class ApiService {
 
   bool get isMock => false;
 
+  /// Picks how bills are read: sample data (only if asked for), a paid
+  /// backend at `EXTRACT_URL`, or Gemini through Firebase AI Logic (free
+  /// Spark plan) when Firebase is configured.
   /// [appCheckToken] attests the request comes from the genuine app.
-  factory ApiService.create({Future<String?> Function()? appCheckToken}) {
+  factory ApiService.create({bool firebaseReady = false, Future<String?> Function()? appCheckToken}) {
     if (Env.useMockApi) return MockApiService();
-    final uri = Uri.tryParse(Env.extractUrl);
-    if (uri == null || uri.host.isEmpty || !isAllowedBackend(uri, release: kReleaseMode)) {
-      return UnavailableApiService();
+    if (Env.extractUrl.isNotEmpty) {
+      final uri = Uri.tryParse(Env.extractUrl);
+      if (uri == null || uri.host.isEmpty || !isAllowedBackend(uri, release: kReleaseMode)) {
+        return UnavailableApiService();
+      }
+      return HttpApiService(uri, appCheckToken: appCheckToken);
     }
-    return HttpApiService(uri, appCheckToken: appCheckToken);
+    if (firebaseReady) return FirebaseAiApiService();
+    return UnavailableApiService();
   }
 }
 

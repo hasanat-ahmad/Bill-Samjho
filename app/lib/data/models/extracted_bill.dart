@@ -10,6 +10,7 @@ class ExtractedBill {
     this.presentReading,
     required this.units,
     this.tariffCategory,
+    this.protectedConsumer,
     this.energyCharges,
     this.fixedCharges,
     this.fpa,
@@ -33,6 +34,10 @@ class ExtractedBill {
   final int? presentReading;
   final int units;
   final String? tariffCategory; // as printed, e.g. "A-1a(01)"
+
+  /// The bill's printed category: true = Protected, false = Unprotected,
+  /// null = not printed.
+  final bool? protectedConsumer;
   final double? energyCharges; // "Cost of electricity"
   final double? fixedCharges;
   final double? fpa;
@@ -56,6 +61,7 @@ class ExtractedBill {
         presentReading: _int(json['present_reading']),
         units: _int(json['units']) ?? 0,
         tariffCategory: _str(json['tariff_category']),
+        protectedConsumer: _protected(json['protected_consumer']),
         energyCharges: _double(json['energy_charges']),
         fixedCharges: _double(json['fixed_charges']),
         fpa: _double(json['fpa']),
@@ -121,6 +127,7 @@ class ExtractedBill {
       presentReading: reading('present_reading'),
       units: units,
       tariffCategory: _clean(json['tariff_category'], 24),
+      protectedConsumer: _protected(json['protected_consumer']),
       energyCharges: amount('energy_charges'),
       fixedCharges: amount('fixed_charges'),
       fpa: amount('fpa'),
@@ -155,6 +162,7 @@ class ExtractedBill {
         'present_reading': presentReading,
         'units': units,
         'tariff_category': tariffCategory,
+        'protected_consumer': protectedConsumer,
         'energy_charges': energyCharges,
         'fixed_charges': fixedCharges,
         'fpa': fpa,
@@ -183,6 +191,7 @@ class ExtractedBill {
         presentReading: presentReading,
         units: units ?? this.units,
         tariffCategory: tariffCategory,
+        protectedConsumer: protectedConsumer,
         energyCharges: energyCharges,
         fixedCharges: fixedCharges,
         fpa: fpa,
@@ -216,6 +225,16 @@ class HistoryEntry {
   }
 
   Map<String, dynamic> toJson() => {'month': month, 'units': units, 'amount': amount};
+}
+
+/// true/false, or "Protected" / "Unprotected" / "Non-Protected".
+bool? _protected(Object? v) {
+  if (v is bool) return v;
+  if (v is! String) return null;
+  final s = v.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z]'), '');
+  if (s == 'PROTECTED') return true;
+  if (s == 'UNPROTECTED' || s == 'NONPROTECTED') return false;
+  return null;
 }
 
 String? _str(Object? v) {

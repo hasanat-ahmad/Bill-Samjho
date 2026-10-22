@@ -12,6 +12,10 @@ class Env {
   /// step 5). Off unless explicitly asked for, so the app never shows sample
   /// data by accident; the app then shows a "demo mode" banner.
   static const useMockApi = bool.fromEnvironment('USE_MOCK_API');
+
+  /// Firebase App Check (Play Integrity). Only for builds installed from
+  /// Google Play: sideloaded APKs cannot pass it, so it is off by default.
+  static const appCheck = bool.fromEnvironment('APP_CHECK');
 }
 
 class AppConstants {

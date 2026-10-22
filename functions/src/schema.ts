@@ -16,6 +16,7 @@ Hints for Pakistani bills (text may be in English and Urdu):
   "Payable Within Due Date", "Payable After Due Date", "Cost of Electricity", "Fixed Charges", "F.P.A" or "Fuel Price Adjustment",
   "QTR Tariff Adj", "GST", "Arrears", "Previous" and "Present" readings, "Reference No".
 - energy_charges is only the "Cost of Electricity" line, not the total. "F.C. Surcharge" (financing cost) is NOT the fuel price adjustment.
+  "Total Electricity Charges" on newer bills is also not energy_charges.
 - Some newer bills print only the total and a QR code. Then return null for charge lines that are not printed; do not compute them.
 - late_surcharge = the "L.P. Surcharge" (late payment) amount if printed; otherwise null.
 - If the payable amount is marked "CR" or "Credit Bill", it is a credit: return total_due as a negative number (e.g. "297 CR" means -297).
@@ -39,6 +40,7 @@ export const BILL_SCHEMA: Schema = {
     meter_multiplier: num("Meter multiplying factor (MF) if printed, else null"),
     units: int("Units consumed this month as printed"),
     tariff_category: str("Tariff as printed, e.g. A-1a(01)"),
+    protected_consumer: { type: Type.BOOLEAN, nullable: true, description: "true if the bill's category says Protected, false if Unprotected or Non-Protected, null if not printed" },
     energy_charges: num("Cost of electricity / energy charges"),
     fixed_charges: num(),
     fpa: num("Fuel price adjustment"),

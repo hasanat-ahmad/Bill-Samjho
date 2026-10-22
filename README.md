@@ -13,7 +13,7 @@ firebase.json, firestore.rules
 Two ways to get a bill:
 
 1. **Reference number (WAPDA companies):** the app opens the user's bill on PITC's official duplicate-bill website (`bill.pitc.com.pk`) inside the app, with the 14-digit reference number filled in. The user taps *Search* on the official page (and answers any CAPTCHA PITC shows); the app never submits the form or works around PITC's protections. Once the bill is showing, *Explain this bill* reads it on the phone (`assets/pitc/read_bill.js` + `PitcBillParser`). No AI and no backend are needed; if a page layout is not recognised, the page text is sent to the `extractBillText` function instead. The reference number is saved on the meter, so *Get latest bill* is one tap next month. Supported: LESCO, IESCO, FESCO, GEPCO, MEPCO, PESCO, HESCO, SEPCO, QESCO, TESCO, HAZECO. K-Electric bills are not on PITC; use a photo.
-2. **Photo:** the bill photo is read by Gemini through the `extractBill` function.
+2. **Photo:** the bill photo is read by Gemini. By default through **Firebase AI Logic**, which works on Firebase's free Spark plan (the Gemini key stays in Firebase's proxy, never in the app, and nothing is billed). If a paid Blaze project is available, the `extractBill` Cloud Function can be used instead with `--dart-define=EXTRACT_URL=...`.
 
 **Key principle:** AI only reads the image. The rules engine on the phone makes every judgement and fills every number into fixed templates.
 
@@ -77,7 +77,15 @@ cd app && flutter run --dart-define=EXTRACT_URL=http://10.0.2.2:5001/demo-bill-s
 
 Gemini models are tried in order: if one is overloaded (503) or slow, the next is used within an 18-second budget. On 2026-10-22, `gemini-2.5-flash` was no longer available to new keys and `gemini-3.5-flash` / `gemini-3.5-flash-lite` read test bills correctly in 4–11 s.
 
-## Firebase setup
+## Firebase setup (free Spark plan, current)
+
+Project: `bill-samjho`. Already done: Android app registered (`app/android/app/google-services.json`, git-ignored) and tariffs deployed to Remote Config.
+
+One manual step in the [Firebase console](https://console.firebase.google.com/project/bill-samjho/ailogic): **AI Logic → Get started → Gemini Developer API** (no billing). Photo scanning then works in the existing APK.
+
+App Check is off by default because sideloaded APKs cannot pass Play Integrity. For a Google Play build: register Play Integrity in the console, build with `--dart-define=APP_CHECK=true`, then enforce App Check for AI Logic.
+
+## Firebase setup (paid Blaze plan, optional)
 
 The app works without Firebase: it uses the bundled tariff config, no crash reporting and no App Check. To connect it:
 

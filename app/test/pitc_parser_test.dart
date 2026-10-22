@@ -100,6 +100,7 @@ void main() {
       expect(b.tariffCategory, 'A-1A(01)');
       expect(b.arrears, 0);
       expect(b.fpa, 0);
+      expect(b.protectedConsumer, isFalse); // "CATEGORY Unprotected"
       // "Total Electricity Charges" is not the energy charge: no false alarm.
       expect(b.energyCharges, isNull);
     });

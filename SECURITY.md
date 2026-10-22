@@ -6,7 +6,7 @@ Bill Samjho handles electricity bills, which show a household's name, address an
 
 | Data | Where | How long |
 |---|---|---|
-| Bill photo | Sent to the backend over HTTPS, read by Gemini in memory | Never stored or logged on the server |
+| Bill photo | Sent over HTTPS to Gemini through Firebase AI Logic (or the optional backend) | Not stored by Bill Samjho. On Gemini's **free tier, Google may use inputs to improve its products**; the app says so, and the reference-number lookup avoids AI entirely |
 | Reference number | Sent only to PITC's official site; saved on the phone with the meter | Until the user deletes the meter |
 | Bill page text | Only if the page layout is not recognised: sent to the backend, read in memory | Never stored or logged on the server |
 | Bill numbers, photo copy | On the phone only, encrypted | Until the user deletes them |
