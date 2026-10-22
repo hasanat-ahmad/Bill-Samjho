@@ -14,8 +14,10 @@ import 'package:path_provider/path_provider.dart';
 
 import 'app.dart';
 import 'core/constants.dart';
+import 'core/firebase_gate.dart';
 import 'core/i18n.dart';
 import 'data/api_service.dart';
+import 'data/bill_chat.dart';
 import 'data/bill_repository.dart';
 import 'data/local_store.dart';
 import 'data/tariff_config_service.dart';
@@ -36,7 +38,8 @@ Future<void> main() async {
     systemNavigationBarIconBrightness: Brightness.dark,
   ));
 
-  final firebaseReady = await _initFirebase();
+  // Never wait for Firebase before the first screen.
+  final firebase = FirebaseGate(_initFirebase());
 
   await Hive.initFlutter();
   final store = LocalStore();
@@ -51,14 +54,17 @@ Future<void> main() async {
   };
 
   final tariffs = TariffConfigService();
-  await tariffs.load(firebaseReady: firebaseReady);
+  await tariffs.loadBundled();
+  unawaited(firebase.ready.then((ok) => ok ? tariffs.connectRemote() : null));
 
   final docs = await getApplicationDocumentsDirectory();
   final repo = BillRepository(
     store: store,
     api: ApiService.create(
-      firebaseReady: firebaseReady,
-      appCheckToken: firebaseReady && Env.appCheck ? () => FirebaseAppCheck.instance.getToken() : null,
+      firebase: firebase,
+      appCheckToken: Env.appCheck
+          ? () async => await firebase.ready ? FirebaseAppCheck.instance.getToken() : null
+          : null,
     ),
     tariffConfig: () => tariffs.config,
     imagesDir: Directory('${docs.path}/bills'),
@@ -78,6 +84,7 @@ Future<void> main() async {
     translations: translations,
     tts: tts,
     scanner: ScanService(),
+    chat: ChatAvailability((prompt) => FirebaseBillChat(prompt, firebase), firebase: firebase),
     appVersion: version,
   ));
 }

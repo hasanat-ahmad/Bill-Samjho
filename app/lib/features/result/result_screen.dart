@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants.dart';
 import '../../core/i18n.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
+import '../../data/bill_chat.dart';
 import '../../data/bill_repository.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/finding.dart';
 import '../../domain/explanation_builder.dart';
+import '../../domain/forecaster.dart';
 import '../../domain/format.dart';
 import '../../services/tts_service.dart';
 import '../settings/settings_cubit.dart';
@@ -69,6 +73,10 @@ class _ResultScreenState extends State<ResultScreen> {
         }
         final builder = ExplanationBuilder(s);
         final findings = ExplanationBuilder.ordered(bill.findings);
+        final repo = context.read<BillRepository>();
+        // Estimate only from a meter's latest bill.
+        final isLatest = repo.latestBill(bill.connectionId)?.id == bill.id;
+        final canChat = context.read<ChatAvailability>().enabled;
 
         return Scaffold(
           appBar: AppBar(title: Text(state.connection?.nickname ?? s.t('app_name'))),
@@ -89,9 +97,19 @@ class _ResultScreenState extends State<ResultScreen> {
                   const SizedBox(height: Gap.lg),
                   ListenButton(id: 'all', text: builder.build(bill.verdict, bill.findings), label: s.t('listen_all')),
                   _MeterSection(units: bill.data.units),
+                  if (isLatest)
+                    _ForecastSection(
+                      bill: bill,
+                      past: repo.billsFor(bill.connectionId).where((b) => b.id != bill.id).toList(),
+                    ),
                   SectionTitle(s.t('findings_title')),
                   for (final f in findings) ...[
                     _FindingCard(finding: f, text: builder.findingText(f)),
+                    const SizedBox(height: Gap.md),
+                  ],
+                  if (canChat) ...[
+                    const SizedBox(height: Gap.sm),
+                    _AskCard(onPressed: () => context.push('/chat/${bill.id}')),
                     const SizedBox(height: Gap.md),
                   ],
                   if (bill.verdict != Verdict.normal) ...[
@@ -324,6 +342,183 @@ class _TtsTip extends StatelessWidget {
             onPressed: () => launchUrl(Uri.parse(AppConstants.googleTtsPlayStoreUrl), mode: LaunchMode.externalApplication),
           ),
         ),
+      ]),
+    );
+  }
+}
+
+/// Next-bill estimate, with an optional check against today's meter reading.
+class _ForecastSection extends StatefulWidget {
+  const _ForecastSection({required this.bill, required this.past});
+
+  final Bill bill;
+  final List<Bill> past;
+
+  @override
+  State<_ForecastSection> createState() => _ForecastSectionState();
+}
+
+class _ForecastSectionState extends State<_ForecastSection> {
+  int? _meterReading;
+
+  Future<void> _askMeterReading() async {
+    final s = context.read<AppStrings>();
+    final last = widget.bill.data.presentReading!;
+    final reading = await showDialog<int>(
+      context: context,
+      builder: (context) => _MeterDialog(lastReading: last, s: s),
+    );
+    if (reading != null && mounted) setState(() => _meterReading = reading);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final theme = Theme.of(context);
+    final forecast = Forecaster(context.read<BillRepository>().tariffConfig)
+        .forecast(widget.bill.data, widget.past, meterReading: _meterReading);
+    if (forecast == null) return const SizedBox.shrink();
+    final builder = ExplanationBuilder(s);
+    final tone = forecast.overLimit ? Tone.wrong : forecast.mayCrossLimit ? Tone.check : Tone.normal;
+    final hasAmount = forecast.amountLow != null && forecast.amountHigh != null;
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      SectionTitle(s.t('forecast_title')),
+      AppCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            const IconBadge(Icons.insights_rounded, color: AppColors.primary, background: AppColors.primarySoft, size: 36),
+            const SizedBox(width: Gap.md),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(formatMonth(forecast.month, s), style: theme.textTheme.bodySmall),
+                Text(
+                  s.t('forecast_units', {'units': formatNumber(forecast.units)}),
+                  style: theme.textTheme.titleMedium,
+                ),
+              ]),
+            ),
+            PlayButton(id: 'forecast', text: builder.forecastText(forecast), tone: tone),
+          ]),
+          if (hasAmount) ...[
+            const SizedBox(height: Gap.sm),
+            Text(
+              '${formatAmount(forecast.amountLow!, s)} – ${formatAmount(forecast.amountHigh!, s)}',
+              style: numberStyle(22),
+            ),
+          ],
+          const SizedBox(height: Gap.xs),
+          Text(builder.forecastBasis(forecast), style: theme.textTheme.bodySmall),
+          const SizedBox(height: Gap.md),
+          Container(
+            padding: const EdgeInsets.all(Gap.md),
+            decoration: BoxDecoration(color: tone.soft, borderRadius: BorderRadius.circular(Radii.sm)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(tone.icon, color: tone.color, size: 20),
+              const SizedBox(width: Gap.sm),
+              Expanded(
+                child: Text(builder.forecastAdvice(forecast), style: theme.textTheme.bodyMedium?.copyWith(color: tone.ink)),
+              ),
+            ]),
+          ),
+          if (widget.bill.data.presentReading != null) ...[
+            const SizedBox(height: Gap.sm),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                icon: const Icon(Icons.speed_rounded, size: 20),
+                label: Text(s.t('forecast_meter')),
+                onPressed: _askMeterReading,
+              ),
+            ),
+          ],
+          Text(s.t('forecast_disclaimer'), style: theme.textTheme.bodySmall),
+        ]),
+      ),
+    ]);
+  }
+}
+
+class _MeterDialog extends StatefulWidget {
+  const _MeterDialog({required this.lastReading, required this.s});
+
+  final int lastReading;
+  final AppStrings s;
+
+  @override
+  State<_MeterDialog> createState() => _MeterDialogState();
+}
+
+class _MeterDialogState extends State<_MeterDialog> {
+  final _value = TextEditingController();
+  String? _error;
+
+  @override
+  void dispose() {
+    _value.dispose();
+    super.dispose();
+  }
+
+  void _apply() {
+    final n = int.tryParse(_value.text);
+    if (n == null || n < widget.lastReading || n > widget.lastReading + 5000) {
+      setState(() => _error = widget.s.t('forecast_meter_invalid', {'reading': '${widget.lastReading}'}));
+      return;
+    }
+    Navigator.pop(context, n);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.s;
+    return AlertDialog(
+      icon: const Icon(Icons.speed_rounded, color: AppColors.primary, size: 32),
+      title: Text(s.t('forecast_meter_title')),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text(s.t('forecast_meter_last', {'reading': '${widget.lastReading}'}), style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(height: Gap.md),
+        TextField(
+          controller: _value,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          textDirection: TextDirection.ltr,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(9)],
+          style: numberStyle(22),
+          decoration: InputDecoration(hintText: s.t('forecast_meter_hint'), errorText: _error),
+          onSubmitted: (_) => _apply(),
+        ),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(s.t('cancel'))),
+        FilledButton(onPressed: _apply, child: Text(s.t('forecast_meter_apply'))),
+      ],
+    );
+  }
+}
+
+class _AskCard extends StatelessWidget {
+  const _AskCard({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final theme = Theme.of(context);
+    return AppCard(
+      color: AppColors.primarySoft,
+      borderColor: AppColors.primarySoft,
+      onTap: onPressed,
+      child: Row(children: [
+        const IconBadge(Icons.forum_rounded, color: AppColors.primary, background: Colors.white),
+        const SizedBox(width: Gap.md),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(s.t('chat_entry_title'), style: theme.textTheme.titleMedium?.copyWith(color: AppColors.primaryDark)),
+            Text(s.t('chat_entry_body'), style: theme.textTheme.bodySmall),
+          ]),
+        ),
+        const Icon(Icons.chevron_right_rounded, color: AppColors.primaryDark),
       ]),
     );
   }

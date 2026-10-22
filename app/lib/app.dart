@@ -8,6 +8,7 @@ import 'core/constants.dart';
 import 'core/i18n.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
+import 'data/bill_chat.dart';
 import 'data/bill_repository.dart';
 import 'data/local_store.dart';
 import 'features/home/home_cubit.dart';
@@ -23,6 +24,7 @@ class BillSamjhoApp extends StatefulWidget {
     required this.translations,
     required this.tts,
     required this.scanner,
+    this.chat = const ChatAvailability(null),
     this.appVersion = '',
   });
 
@@ -31,6 +33,7 @@ class BillSamjhoApp extends StatefulWidget {
   final Map<AppLanguage, AppStrings> translations;
   final TtsService tts;
   final ScanService scanner;
+  final ChatAvailability chat;
   final String appVersion;
 
   @override
@@ -78,6 +81,7 @@ class _BillSamjhoAppState extends State<BillSamjhoApp> {
         RepositoryProvider.value(value: widget.repo),
         RepositoryProvider.value(value: widget.tts),
         RepositoryProvider.value(value: widget.scanner),
+        RepositoryProvider.value(value: widget.chat),
         RepositoryProvider<AppVersion>.value(value: AppVersion(widget.appVersion)),
       ],
       child: MultiBlocProvider(

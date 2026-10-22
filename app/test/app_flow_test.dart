@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:bill_samjho/app.dart';
 import 'package:bill_samjho/core/i18n.dart';
 import 'package:bill_samjho/data/api_service.dart';
+import 'package:bill_samjho/data/bill_chat.dart';
 import 'package:bill_samjho/data/bill_repository.dart';
 import 'package:bill_samjho/data/local_store.dart';
 import 'package:bill_samjho/data/models/tariff_config.dart';
@@ -18,6 +19,14 @@ import 'package:hive_ce/hive_ce.dart';
 Map<String, dynamic> _json(String path) => jsonDecode(File(path).readAsStringSync()) as Map<String, dynamic>;
 
 final _jpeg = File('test/fixtures/bill.jpg').readAsBytesSync();
+
+class FakeChat implements BillChat {
+  @override
+  bool get atLimit => false;
+
+  @override
+  Stream<String> ask(String question) => Stream.fromIterable(['FPA is', 'FPA is a fuel cost adjustment.']);
+}
 
 class FakeScanService extends ScanService {
   @override
@@ -81,6 +90,7 @@ void main() {
       translations: translations,
       tts: TtsService(),
       scanner: FakeScanService(),
+      chat: ChatAvailability((_) => FakeChat()),
       appVersion: '1.0.0',
     ));
     await tester.pumpAndSettle();
@@ -264,5 +274,38 @@ void main() {
     await tester.pumpAndSettle();
     await tapAsync(tester, find.text('Home').last); // the meter in the sheet
     expect(find.text('اپنا بل آن لائن دیکھیں'), findsOneWidget);
+  });
+
+  testWidgets('result shows the next-bill estimate and the helper answers a suggested question', (tester) async {
+    await tester.runAsync(() async {
+      await store.setSetting(SettingKeys.onboardingDone, true);
+      final c = await repo.addConnection('Home');
+      await repo.analyseAndSave(connectionId: c.id, data: await MockApiService().extractBill(Uint8List(0), ''), jpeg: _jpeg);
+    });
+    await pumpApp(tester);
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('September 2026'), 300);
+    await tester.tap(find.text('September 2026'));
+    await tester.pumpAndSettle();
+
+    final page = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(find.text('Next bill estimate'), 300, scrollable: page);
+    expect(find.text('October 2026'), findsOneWidget);
+    expect(find.textContaining('Based on the same month last year'), findsNothing); // sample history has no Oct 2025
+    expect(find.textContaining('Based on your last few months'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('Have a question about this bill?'), 300, scrollable: page);
+    await tester.ensureVisible(find.text('Have a question about this bill?'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Have a question about this bill?'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ask about your bill'), findsOneWidget);
+    expect(find.textContaining('Assalam-o-Alaikum!'), findsOneWidget);
+
+    await tester.tap(find.text('What is FPA?'));
+    await tester.pumpAndSettle();
+    expect(find.text('What is FPA?'), findsOneWidget); // now as the user's message
+    expect(find.text('FPA is a fuel cost adjustment.'), findsOneWidget);
   });
 }
