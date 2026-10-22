@@ -2,16 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/constants.dart';
+import '../../core/i18n.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/bill_repository.dart';
-import '../../data/models/urdu_strings.dart';
-import '../../domain/urdu_format.dart';
+import '../../domain/format.dart';
 import 'home_cubit.dart';
 import 'pick_connection_sheet.dart';
 
-/// S2: connection cards and the big "new bill" button.
+/// S2: meter cards and the main "scan new bill" action (max 2 taps to scan).
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -22,43 +21,79 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     return Scaffold(
       appBar: AppBar(
-        title: const Text(Labels.appName),
-        leading: IconButton(
-          tooltip: Labels.glossary,
-          icon: const Icon(Icons.menu_book),
-          onPressed: () => context.push('/glossary'),
-        ),
+        titleSpacing: Gap.page,
+        title: Row(children: [
+          const AppLogo(size: 36),
+          const SizedBox(width: Gap.md),
+          Flexible(child: Text(s.t('app_name'), overflow: TextOverflow.ellipsis)),
+        ]),
         actions: [
           IconButton(
-            tooltip: Labels.settings,
-            icon: const Icon(Icons.settings),
+            tooltip: s.t('glossary'),
+            icon: const Icon(Icons.menu_book_rounded),
+            onPressed: () => context.push('/glossary'),
+          ),
+          IconButton(
+            tooltip: s.t('settings'),
+            icon: const Icon(Icons.settings_rounded),
             onPressed: () => context.push('/settings'),
           ),
+          const SizedBox(width: Gap.xs),
         ],
       ),
-      body: BlocBuilder<HomeCubit, List<ConnectionSummary>>(
-        builder: (context, connections) {
-          if (connections.isEmpty) {
-            return const MessageView(
-              icon: Icons.document_scanner,
-              message: Labels.scanFirstBill,
-              detail: Labels.scanFirstBillHint,
-            );
-          }
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
-            children: [for (final c in connections) _ConnectionCard(c)],
-          );
-        },
+      body: Column(children: [
+        const DemoBanner(),
+        Expanded(
+          child: BlocBuilder<HomeCubit, List<ConnectionSummary>>(
+            builder: (context, connections) => connections.isEmpty
+                ? const _EmptyHome()
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(Gap.page, 0, Gap.page, Gap.xl),
+                    itemCount: connections.length + 1,
+                    separatorBuilder: (_, i) => SizedBox(height: i == 0 ? 0 : Gap.md),
+                    itemBuilder: (context, i) =>
+                        i == 0 ? SectionTitle(s.t('your_meters')) : _ConnectionCard(connections[i - 1]),
+                  ),
+          ),
+        ),
+      ]),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(Gap.page, Gap.sm, Gap.page, Gap.lg),
+          child: PrimaryButton(
+            label: s.t('scan_bill'),
+            icon: Icons.photo_camera_rounded,
+            onPressed: () => _newBill(context),
+          ),
+        ),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _newBill(context),
-        icon: const Icon(Icons.camera_alt, size: 32),
-        label: const Text(Labels.newBill),
-      ),
+    );
+  }
+}
+
+class _EmptyHome extends StatelessWidget {
+  const _EmptyHome();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(Gap.page, Gap.lg, Gap.page, Gap.xl),
+      children: [
+        const BillIllustration(height: 170),
+        const SizedBox(height: Gap.xl),
+        Text(s.t('empty_title'), style: theme.textTheme.headlineSmall),
+        const SizedBox(height: Gap.xs),
+        Text(s.t('empty_body'), style: theme.textTheme.bodyMedium),
+        const SizedBox(height: Gap.lg),
+        StepRow(number: 1, icon: Icons.photo_camera_rounded, text: s.t('step_photo')),
+        StepRow(number: 2, icon: Icons.edit_note_rounded, text: s.t('step_check')),
+        StepRow(number: 3, icon: Icons.record_voice_over_rounded, text: s.t('step_listen')),
+      ],
     );
   }
 }
@@ -70,45 +105,50 @@ class _ConnectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     final theme = Theme.of(context);
     final bill = summary.latestBill;
+    final connection = summary.connection;
     final config = context.read<BillRepository>().tariffConfig;
-    final strings = context.read<UrduStrings>();
+    final subtitle = [
+      ?connection.disco,
+      if (bill != null) formatMonth(bill.data.billMonth, s),
+    ].join(' · ');
 
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => context.push('/history/${summary.connection.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Icon(Icons.home, size: 32, color: theme.colorScheme.primary),
-              const SizedBox(width: 10),
-              Expanded(child: Text(summary.connection.nickname, style: theme.textTheme.titleLarge)),
-              if (bill != null) VerdictBadge(bill.verdict),
+    return AppCard(
+      onTap: () => context.push('/history/${connection.id}'),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          const IconBadge(Icons.home_rounded, color: AppColors.primary, background: AppColors.primarySoft),
+          const SizedBox(width: Gap.md),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(connection.nickname, style: theme.textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (subtitle.isNotEmpty) Text(subtitle, style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
             ]),
-            const SizedBox(height: 8),
-            if (bill == null)
-              Text(Labels.noBillYet, style: theme.textTheme.bodyLarge)
-            else ...[
-              Row(children: [
-                Expanded(child: Text(formatMonth(bill.data.billMonth, strings), style: theme.textTheme.bodyLarge)),
-                Text(formatNumber(bill.data.units), style: numberStyle.copyWith(fontSize: 22)),
-                const SizedBox(width: 6),
-                Text(Labels.units, style: theme.textTheme.bodyLarge),
-              ]),
-              const SizedBox(height: 8),
-              UnitMeter(
-                units: bill.data.units,
-                limit: config.protectedLimitUnits,
-                nearLimit: config.nearLimitUnits,
-                height: 12,
-              ),
-            ],
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.inkMuted),
+        ]),
+        const SizedBox(height: Gap.lg),
+        if (bill == null)
+          Text(s.t('no_bill_yet'), style: theme.textTheme.bodyMedium)
+        else ...[
+          Row(children: [
+            Expanded(child: Text(formatAmount(bill.data.totalDue, s), style: numberStyle(26))),
+            VerdictPill(bill.verdict),
           ]),
-        ),
-      ),
+          const SizedBox(height: Gap.md),
+          UnitMeter(units: bill.data.units, limit: config.protectedLimitUnits, nearLimit: config.nearLimitUnits, height: 10),
+          const SizedBox(height: Gap.xs),
+          Text(
+            s.t('units_of_limit', {
+              'units': formatNumber(bill.data.units),
+              'limit': formatNumber(config.protectedLimitUnits),
+            }),
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
+      ]),
     );
   }
 }

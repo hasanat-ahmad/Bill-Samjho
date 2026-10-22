@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/constants.dart';
+import '../../core/i18n.dart';
+import '../../core/theme.dart';
+import '../../core/widgets.dart';
 import '../../data/bill_repository.dart';
 
 /// S3: choose which meter the bill is for, or add one (FR-02).
@@ -10,9 +13,11 @@ Future<String?> showPickConnectionSheet(BuildContext context) => showModalBottom
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => RepositoryProvider.value(
-        value: context.read<BillRepository>(),
+      builder: (_) => MultiRepositoryProvider(
+        providers: [
+          RepositoryProvider.value(value: context.read<BillRepository>()),
+          RepositoryProvider.value(value: context.read<AppStrings>()),
+        ],
         child: const _PickConnectionSheet(),
       ),
     );
@@ -26,6 +31,7 @@ class _PickConnectionSheet extends StatefulWidget {
 
 class _PickConnectionSheetState extends State<_PickConnectionSheet> {
   final _name = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -34,66 +40,77 @@ class _PickConnectionSheetState extends State<_PickConnectionSheet> {
   }
 
   Future<void> _create(String nickname) async {
-    if (nickname.trim().isEmpty) return;
+    if (_busy || BillRepository.cleanNickname(nickname).isEmpty) return;
+    setState(() => _busy = true);
     final c = await context.read<BillRepository>().addConnection(nickname);
     if (mounted) Navigator.pop(context, c.id);
   }
 
   @override
   Widget build(BuildContext context) {
+    final s = context.s;
     final theme = Theme.of(context);
     final connections = context.read<BillRepository>().connections();
     final used = connections.map((c) => c.nickname).toSet();
-    final presets = AppConstants.connectionPresets.where((p) => !used.contains(p));
+    final presets = AppConstants.connectionPresets.map(s.t).where((p) => !used.contains(p));
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        padding: const EdgeInsets.fromLTRB(Gap.page, 0, Gap.page, Gap.xl),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (connections.isNotEmpty) ...[
-            Text(Labels.pickConnection, style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
+            Text(s.t('pick_title'), style: theme.textTheme.titleLarge),
+            const SizedBox(height: Gap.lg),
             for (final c in connections)
               Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: FilledButton.tonalIcon(
-                  style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(64)),
-                  icon: const Icon(Icons.home, size: 28),
-                  label: Text(c.nickname, style: const TextStyle(fontSize: 22)),
-                  onPressed: () => Navigator.pop(context, c.id),
+                padding: const EdgeInsets.only(bottom: Gap.sm),
+                child: AppCard(
+                  padding: const EdgeInsets.all(Gap.md),
+                  onTap: () => Navigator.pop(context, c.id),
+                  child: Row(children: [
+                    const IconBadge(Icons.home_rounded, color: AppColors.primary, background: AppColors.primarySoft),
+                    const SizedBox(width: Gap.md),
+                    Expanded(child: Text(c.nickname, style: theme.textTheme.titleMedium)),
+                    const Icon(Icons.photo_camera_rounded, color: AppColors.primary),
+                  ]),
                 ),
               ),
-            const Divider(height: 32),
+            const SizedBox(height: Gap.md),
           ],
-          Text(Labels.newConnection, style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
-          const SizedBox(height: 12),
+          Text(s.t('add_meter'), style: theme.textTheme.titleLarge),
+          const SizedBox(height: Gap.md),
           Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 10,
-            runSpacing: 10,
+            spacing: Gap.sm,
+            runSpacing: Gap.sm,
             children: [
               for (final p in presets)
                 ActionChip(
-                  avatar: const Icon(Icons.add),
+                  avatar: const Icon(Icons.add_rounded, color: AppColors.primary),
                   label: Text(p),
                   onPressed: () => _create(p),
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-          Row(children: [
+          const SizedBox(height: Gap.md),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(
               child: TextField(
                 controller: _name,
-                style: const TextStyle(fontSize: 20),
-                decoration: const InputDecoration(hintText: Labels.nicknameHint),
+                maxLength: AppConstants.nicknameMaxLength,
+                textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.done,
+                style: theme.textTheme.bodyLarge,
+                decoration: InputDecoration(hintText: s.t('nickname_hint'), counterText: ''),
                 onSubmitted: _create,
               ),
             ),
-            const SizedBox(width: 10),
-            FilledButton(onPressed: () => _create(_name.text), child: const Text(Labels.add)),
+            const SizedBox(width: Gap.sm),
+            FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(64, 58)),
+              onPressed: () => _create(_name.text),
+              child: Text(s.t('add')),
+            ),
           ]),
         ]),
       ),
