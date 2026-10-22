@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:uuid/uuid.dart';
 
+import '../core/constants.dart';
 import '../domain/rules_engine.dart';
 import 'api_service.dart';
 import 'local_store.dart';
@@ -11,7 +12,6 @@ import 'models/bill.dart';
 import 'models/connection.dart';
 import 'models/extracted_bill.dart';
 import 'models/tariff_config.dart';
-import 'models/urdu_strings.dart';
 
 /// Single entry point for connections and bills.
 class BillRepository {
@@ -19,23 +19,23 @@ class BillRepository {
     required LocalStore store,
     required ApiService api,
     required TariffConfig Function() tariffConfig,
-    required UrduStrings strings,
     required Directory imagesDir,
   })  : _store = store,
         _api = api,
         _tariffConfig = tariffConfig,
-        _strings = strings,
         _imagesDir = imagesDir;
 
   final LocalStore _store;
   final ApiService _api;
   final TariffConfig Function() _tariffConfig;
-  final UrduStrings _strings;
   final Directory _imagesDir;
   final _changes = StreamController<void>.broadcast();
   static const _uuid = Uuid();
 
   TariffConfig get tariffConfig => _tariffConfig();
+
+  /// True when bills come from the sample data, not the real backend.
+  bool get isDemo => _api.isMock;
 
   /// Fires after any connection or bill is added or deleted.
   Stream<void> get changes => _changes.stream;
@@ -56,8 +56,19 @@ class BillRepository {
 
   Connection? connection(String id) => _store.connection(id);
 
+  static final _unsafeChars = RegExp(r'[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069]');
+
+  /// Removes control and bidi-override characters and caps the length.
+  static String cleanNickname(String raw) {
+    final s = raw.replaceAll(_unsafeChars, '').trim();
+    return String.fromCharCodes(s.runes.take(AppConstants.nicknameMaxLength)).trim();
+  }
+
+  /// Throws [ArgumentError] if the nickname is empty after cleaning.
   Future<Connection> addConnection(String nickname) async {
-    final c = Connection(id: _uuid.v4(), nickname: nickname.trim(), createdAt: DateTime.now());
+    final name = cleanNickname(nickname);
+    if (name.isEmpty) throw ArgumentError.value(nickname, 'nickname');
+    final c = Connection(id: _uuid.v4(), nickname: name, createdAt: DateTime.now());
     await _store.saveConnection(c);
     _changes.add(null);
     return c;
@@ -84,7 +95,8 @@ class BillRepository {
   Bill? bill(String id) => _store.bill(id);
 
   /// Throws [ApiException].
-  Future<ExtractedBill> extract(Uint8List jpeg) => _api.extractBill(jpeg, deviceId);
+  Future<ExtractedBill> extract(Uint8List jpeg, {ProgressCallback? onProgress}) =>
+      _api.extractBill(jpeg, deviceId, onProgress: onProgress);
 
   /// Runs the rules engine on the (possibly user-corrected) [data], then saves
   /// the bill and its image. A rescan of the same month replaces the old bill.
@@ -98,7 +110,7 @@ class BillRepository {
       await deleteBill(old.id);
     }
     final past = existing.where((b) => b.data.billMonth != data.billMonth).toList();
-    final result = RulesEngine(_tariffConfig(), _strings).evaluate(data, past);
+    final result = RulesEngine(_tariffConfig()).evaluate(data, past);
 
     final id = _uuid.v4();
     await _imagesDir.create(recursive: true);

@@ -8,7 +8,6 @@ import 'package:bill_samjho/data/local_store.dart';
 import 'package:bill_samjho/data/models/extracted_bill.dart';
 import 'package:bill_samjho/data/models/finding.dart';
 import 'package:bill_samjho/data/models/tariff_config.dart';
-import 'package:bill_samjho/data/models/urdu_strings.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive_ce.dart';
 
@@ -31,7 +30,6 @@ void main() {
       store: store,
       api: MockApiService(),
       tariffConfig: () => config,
-      strings: UrduStrings(_asset('urdu_strings.json')),
       imagesDir: Directory('${tmp.path}/images'),
     );
   });
@@ -55,6 +53,14 @@ void main() {
     await repo.addConnection(' Ghar ');
     await repo.addConnection('Dukaan');
     expect(repo.connections().map((c) => c.nickname), ['Ghar', 'Dukaan']);
+  });
+
+  test('nicknames are cleaned: control and bidi characters removed, length capped', () async {
+    final c = await repo.addConnection('  Gh\u202Ear\u0000  ');
+    expect(c.nickname, 'Ghar');
+    final long = await repo.addConnection('x' * 100);
+    expect(long.nickname.length, 24);
+    await expectLater(repo.addConnection(' \u200F '), throwsArgumentError);
   });
 
   test('analyseAndSave stores bill, image and fills connection details', () async {
@@ -123,7 +129,7 @@ void main() {
     final bill = await repo.analyseAndSave(connectionId: c.id, data: sample, jpeg: jpeg);
     final loaded = repo.bill(bill.id)!;
     expect(loaded.data.toJson(), sample.toJson());
-    expect(loaded.findings.map((f) => f.urduText), bill.findings.map((f) => f.urduText));
+    expect(loaded.findings.map((f) => f.toJson()), bill.findings.map((f) => f.toJson()));
     expect(loaded.verdict, bill.verdict);
   });
 }
