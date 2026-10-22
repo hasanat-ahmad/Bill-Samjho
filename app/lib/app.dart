@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import 'core/constants.dart';
 import 'core/i18n.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
@@ -37,6 +39,37 @@ class BillSamjhoApp extends StatefulWidget {
 
 class _BillSamjhoAppState extends State<BillSamjhoApp> {
   late final GoRouter _router = buildRouter(widget.store);
+  final _messenger = GlobalKey<ScaffoldMessengerState>();
+  late AppStrings _strings;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.tts.failures.addListener(_onVoiceFailure);
+  }
+
+  @override
+  void dispose() {
+    widget.tts.failures.removeListener(_onVoiceFailure);
+    super.dispose();
+  }
+
+  /// No voice on the phone could speak: say so instead of staying silent.
+  void _onVoiceFailure() {
+    _messenger.currentState
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(_strings.t('voice_failed')),
+        duration: const Duration(seconds: 8),
+        action: SnackBarAction(
+          label: _strings.t('install'),
+          onPressed: () => launchUrl(
+            Uri.parse(AppConstants.googleTtsPlayStoreUrl),
+            mode: LaunchMode.externalApplication,
+          ),
+        ),
+      ));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,12 +87,13 @@ class _BillSamjhoAppState extends State<BillSamjhoApp> {
         ],
         child: BlocBuilder<SettingsCubit, AppSettings>(
           builder: (context, settings) {
-            final strings = widget.translations[settings.language]!;
+            final strings = _strings = widget.translations[settings.language]!;
             return RepositoryProvider<AppStrings>.value(
               value: strings,
               child: MaterialApp.router(
                 title: strings.t('app_name'),
                 debugShowCheckedModeBanner: false,
+                scaffoldMessengerKey: _messenger,
                 theme: buildTheme(settings.language),
                 routerConfig: _router,
                 // The locale also sets text direction: English LTR, Urdu RTL.
