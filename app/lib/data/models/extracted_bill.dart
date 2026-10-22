@@ -23,6 +23,7 @@ class ExtractedBill {
     required this.totalDue,
     this.lateSurcharge,
     this.dueDate,
+    this.readingDate,
     this.history = const [],
     this.confidence = 1,
   });
@@ -50,6 +51,7 @@ class ExtractedBill {
   final double totalDue; // payable within due date
   final double? lateSurcharge;
   final String? dueDate; // "2026-10-15"
+  final String? readingDate; // meter read for this bill, "2026-09-19"
   final List<HistoryEntry> history; // 12-month table printed on bill
   final double confidence; // 0..1 from backend
 
@@ -74,6 +76,7 @@ class ExtractedBill {
         totalDue: _double(json['total_due']) ?? 0,
         lateSurcharge: _double(json['late_surcharge']),
         dueDate: _str(json['due_date']),
+        readingDate: _str(json['reading_date']),
         history: (json['history'] as List? ?? const [])
             .whereType<Map>()
             .map((e) => HistoryEntry.fromJson(Map<String, dynamic>.from(e)))
@@ -110,6 +113,7 @@ class ExtractedBill {
     }
 
     final dueDate = _str(json['due_date']);
+    final readingDate = _str(json['reading_date']);
     final history = <HistoryEntry>[];
     for (final row in (json['history'] is List ? json['history'] as List : const [])) {
       if (row is! Map) continue;
@@ -140,6 +144,7 @@ class ExtractedBill {
       totalDue: total,
       lateSurcharge: amount('late_surcharge'),
       dueDate: dueDate != null && isIsoDate(dueDate) ? dueDate : null,
+      readingDate: readingDate != null && isIsoDate(readingDate) ? readingDate : null,
       history: history,
       confidence: (_double(json['confidence']) ?? 0).clamp(0.0, 1.0),
     );
@@ -175,6 +180,7 @@ class ExtractedBill {
         'total_due': totalDue,
         'late_surcharge': lateSurcharge,
         'due_date': dueDate,
+        'reading_date': readingDate,
         'history': history.map((e) => e.toJson()).toList(),
         'confidence': confidence,
       };
@@ -204,6 +210,7 @@ class ExtractedBill {
         totalDue: totalDue ?? this.totalDue,
         lateSurcharge: lateSurcharge,
         dueDate: dueDate,
+        readingDate: readingDate,
         history: history,
         confidence: confidence,
       );

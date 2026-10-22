@@ -7,6 +7,7 @@ import 'package:firebase_ai/firebase_ai.dart';
 import 'package:flutter/foundation.dart';
 
 import '../core/constants.dart';
+import '../core/firebase_gate.dart';
 import 'api_service.dart';
 import 'models/extracted_bill.dart';
 
@@ -15,8 +16,9 @@ import 'models/extracted_bill.dart';
 /// app) and nothing is billed. Mirrors functions/src (prompt, schema and
 /// validation), which remains the option for a paid backend.
 class FirebaseAiApiService implements ApiService {
-  FirebaseAiApiService({Connectivity? connectivity}) : _connectivity = connectivity ?? Connectivity();
+  FirebaseAiApiService(this._firebase, {Connectivity? connectivity}) : _connectivity = connectivity ?? Connectivity();
 
+  final FirebaseGate _firebase;
   final Connectivity _connectivity;
 
   /// Best first; the next is tried when one is overloaded or out of quota.
@@ -27,6 +29,9 @@ class FirebaseAiApiService implements ApiService {
 
   @override
   bool get isMock => false;
+
+  @override
+  bool get available => _firebase.mayWork;
 
   @override
   Future<ExtractedBill> extractBill(Uint8List jpeg, String deviceId, {ProgressCallback? onProgress}) async {
@@ -46,6 +51,7 @@ class FirebaseAiApiService implements ApiService {
   }
 
   Future<void> _requireNetwork() async {
+    if (!await _firebase.ready) throw const ApiException(ApiError.unavailable);
     final network = await _connectivity.checkConnectivity();
     if (network.every((n) => n == ConnectivityResult.none)) throw const ApiException(ApiError.offline);
   }
@@ -93,9 +99,10 @@ class FirebaseAiApiService implements ApiService {
     throw ApiException(lastError);
   }
 
-  @visibleForTesting
+  /// AI Logic not enabled, App Check enforced, key restrictions: retrying
+  /// other models cannot fix these.
   static bool isSetupError(String message) =>
-      RegExp(r'PERMISSION_DENIED|has not been used|is disabled|API key|API_KEY', caseSensitive: false).hasMatch(message);
+      RegExp(r'PERMISSION_DENIED|UNAUTHENTICATED|App Check|has not been used|is disabled|API key|API_KEY', caseSensitive: false).hasMatch(message);
 
   /// Same rules as functions/src/validate.ts, then the app's strict parsing.
   @visibleForTesting
@@ -188,6 +195,7 @@ Hints for Pakistani bills (text may be in English and Urdu):
       'total_due': _num('Amount payable within due date'),
       'late_surcharge': _num('Extra amount if paid after due date'),
       'due_date': _str('YYYY-MM-DD'),
+      'reading_date': _str('Date the meter was read for this bill, YYYY-MM-DD'),
       'history': Schema.array(
         items: Schema.object(properties: {
           'month': Schema.string(description: 'YYYY-MM'),
@@ -199,7 +207,7 @@ Hints for Pakistani bills (text may be in English and Urdu):
     optionalProperties: [
       'disco', 'reference_no', 'bill_month', 'previous_reading', 'present_reading', 'meter_multiplier',
       'tariff_category', 'protected_consumer', 'energy_charges', 'fixed_charges', 'fpa', 'qtr_adjustment', 'gst',
-      'income_tax', 'electricity_duty', 'tv_fee', 'arrears', 'late_surcharge', 'due_date',
+      'income_tax', 'electricity_duty', 'tv_fee', 'arrears', 'late_surcharge', 'due_date', 'reading_date',
     ],
   );
 }

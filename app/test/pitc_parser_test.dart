@@ -92,6 +92,7 @@ void main() {
       final b = PitcBillParser.parse(page, disco: 'PESCO')!;
       expect(b.billMonth, '2026-09');
       expect(b.dueDate, '2026-10-14');
+      expect(b.readingDate, '2026-09-19');
       expect(b.units, 106);
       expect(b.totalDue, 4367);
       expect(b.referenceNo, '26 11111 2222222');

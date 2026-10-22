@@ -52,6 +52,7 @@ class PitcBillParser {
       'total_due': total,
       'reference_no': find(const ['REFERENCE NO', 'REFERENCE NUMBER', 'REF NO'], _reference) ?? stub?.reference,
       'due_date': find(const ['DUE DATE'], _date) ?? stub?.dueDate,
+      'reading_date': find(const ['READING DATE'], _date),
       'previous_reading': find(const ['PREVIOUS READING', 'PREVIOUS'], _int),
       'present_reading': find(const ['PRESENT READING', 'PRESENT'], _int),
       'tariff_category': find(const ['TARIFF'], _text),
