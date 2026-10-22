@@ -4,8 +4,7 @@ import '../data/models/bill.dart';
 import '../data/models/extracted_bill.dart';
 import '../data/models/finding.dart';
 import '../data/models/tariff_config.dart';
-import '../data/models/urdu_strings.dart';
-import 'urdu_format.dart';
+import 'format.dart';
 
 class RulesResult {
   const RulesResult(this.verdict, this.findings);
@@ -16,13 +15,13 @@ class RulesResult {
   final List<Finding> findings;
 }
 
-/// Judges a bill (SDA §10). Pure Dart: every number in the output comes from
-/// the validated bill data or the tariff config, filled into fixed templates.
+/// Judges a bill (SDA §10). Pure Dart with no text: every finding carries
+/// only values taken from the validated bill or the tariff config, which
+/// [ExplanationBuilder] puts into fixed templates.
 class RulesEngine {
-  RulesEngine(this.config, this.strings);
+  RulesEngine(this.config);
 
   final TariffConfig config;
-  final UrduStrings strings;
 
   RulesResult evaluate(ExtractedBill current, List<Bill> pastBillsForConnection) {
     final past = _pastUnitsByMonth(current, pastBillsForConnection);
@@ -37,8 +36,6 @@ class RulesEngine {
       ?_arrears(current),
       ?_adjustments(current),
     ];
-    // Stable sort keeps rule order within the same severity.
-    final ordered = _stableSortBySeverity(findings);
 
     final worst = findings.fold<Severity?>(
       null,
@@ -50,7 +47,7 @@ class RulesEngine {
       _ => Verdict.normal,
     };
 
-    return RulesResult(verdict, [_summary(current), ...ordered]);
+    return RulesResult(verdict, [_summary(current), ..._stableSortBySeverity(findings)]);
   }
 
   /// Energy charge in rupees for [units], or null when the tariff does not
@@ -84,6 +81,8 @@ class RulesEngine {
 
   static double _round2(double v) => (v * 100).roundToDouble() / 100;
 
+  static String _n(num v) => v.round().toString();
+
   // ---- History ----
 
   /// Units by month index for months before the current bill.
@@ -114,18 +113,15 @@ class RulesEngine {
 
   // ---- Rules (SDA §10.2) ----
 
-  Finding _summary(ExtractedBill b) {
-    final values = {
-      'units': formatNumber(b.units),
-      'total': formatNumber(b.totalDue),
-      if (b.dueDate != null) 'due_date': formatDate(b.dueDate!, strings),
-    };
-    return Finding(
-      ruleId: Finding.summaryId,
-      severity: Severity.info,
-      urduText: strings.fill(b.dueDate == null ? 'summary_no_due_date' : 'summary', values),
-    );
-  }
+  Finding _summary(ExtractedBill b) => Finding(
+        ruleId: Finding.summaryId,
+        severity: Severity.info,
+        params: {
+          'units': '${b.units}',
+          'total': _n(b.totalDue),
+          if (b.dueDate != null) 'due_date': b.dueDate!,
+        },
+      );
 
   /// R1: printed energy charge does not match either tariff.
   Finding? _energyCheck(ExtractedBill b) {
@@ -144,10 +140,7 @@ class RulesEngine {
     return Finding(
       ruleId: 'R1',
       severity: Severity.wrong,
-      urduText: strings.fill('r1_energy_mismatch', {
-        'expected': formatNumber(expected),
-        'printed': formatNumber(printed),
-      }),
+      params: {'expected': _n(expected), 'printed': _n(printed)},
     );
   }
 
@@ -161,7 +154,7 @@ class RulesEngine {
     return Finding(
       ruleId: 'R2',
       severity: b.units > avg * config.jumpWrongRatio ? Severity.wrong : Severity.check,
-      urduText: strings.fill('r2_jump', {'avg': formatNumber(avg)}),
+      params: {'avg': _n(avg)},
     );
   }
 
@@ -173,7 +166,7 @@ class RulesEngine {
         b.previousReading != null &&
         b.presentReading == b.previousReading;
     if (!sameAsLastMonth && !meterNotMoved) return null;
-    return Finding(ruleId: 'R3', severity: Severity.check, urduText: strings.fill('r3_estimated'));
+    return const Finding(ruleId: 'R3', severity: Severity.check);
   }
 
   /// R4: protected status lost this month or in the last N months.
@@ -189,15 +182,15 @@ class RulesEngine {
     if (!overNow && lastOver == null) return null;
     if (overNow && currentIndex != null) lastOver = currentIndex;
 
-    var text = strings.fill('r4_protected_lost', {
-      'limit': formatNumber(limit),
-      'months': formatNumber(config.protectedMonths),
-    });
-    if (lastOver != null) {
-      final returnMonth = monthKey(lastOver + config.protectedMonths);
-      text += ' ${strings.fill('r4_return_month', {'month': formatMonth(returnMonth, strings)})}';
-    }
-    return Finding(ruleId: 'R4', severity: Severity.check, urduText: text);
+    return Finding(
+      ruleId: 'R4',
+      severity: Severity.check,
+      params: {
+        'limit': '$limit',
+        'months': '${config.protectedMonths}',
+        if (lastOver != null) 'return_month': monthKey(lastOver + config.protectedMonths),
+      },
+    );
   }
 
   /// R5: close to the protected limit.
@@ -207,10 +200,7 @@ class RulesEngine {
     return Finding(
       ruleId: 'R5',
       severity: Severity.info,
-      urduText: strings.fill('r5_near_limit', {
-        'limit': formatNumber(limit),
-        'left': formatNumber(limit - b.units),
-      }),
+      params: {'limit': '$limit', 'left': '${limit - b.units}'},
     );
   }
 
@@ -218,17 +208,13 @@ class RulesEngine {
   Finding? _arrears(ExtractedBill b) {
     final arrears = b.arrears;
     if (arrears == null || arrears <= 0) return null;
-    return Finding(
-      ruleId: 'R6',
-      severity: Severity.check,
-      urduText: strings.fill('r6_arrears', {'arrears': formatNumber(arrears)}),
-    );
+    return Finding(ruleId: 'R6', severity: Severity.check, params: {'arrears': _n(arrears)});
   }
 
   /// R7: FPA or quarterly adjustment charged.
   Finding? _adjustments(ExtractedBill b) {
     if ((b.fpa ?? 0) <= 0 && (b.qtrAdjustment ?? 0) <= 0) return null;
-    return Finding(ruleId: 'R7', severity: Severity.info, urduText: strings.fill('r7_adjustments'));
+    return const Finding(ruleId: 'R7', severity: Severity.info);
   }
 
   static List<Finding> _stableSortBySeverity(List<Finding> findings) {
