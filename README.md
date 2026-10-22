@@ -15,6 +15,11 @@ Two ways to get a bill:
 1. **Reference number (WAPDA companies):** the app opens the user's bill on PITC's official duplicate-bill website (`bill.pitc.com.pk`) inside the app, with the 14-digit reference number filled in. The user taps *Search* on the official page (and answers any CAPTCHA PITC shows); the app never submits the form or works around PITC's protections. Once the bill is showing, *Explain this bill* reads it on the phone (`assets/pitc/read_bill.js` + `PitcBillParser`). No AI and no backend are needed; if a page layout is not recognised, the page text is sent to the `extractBillText` function instead. The reference number is saved on the meter, so *Get latest bill* is one tap next month. Supported: LESCO, IESCO, FESCO, GEPCO, MEPCO, PESCO, HESCO, SEPCO, QESCO, TESCO, HAZECO. K-Electric bills are not on PITC; use a photo.
 2. **Photo:** the bill photo is read by Gemini. By default through **Firebase AI Logic**, which works on Firebase's free Spark plan (the Gemini key stays in Firebase's proxy, never in the app, and nothing is billed). If a paid Blaze project is available, the `extractBill` Cloud Function can be used instead with `--dart-define=EXTRACT_URL=...`.
 
+After a bill is read, the result screen also offers:
+
+- **Next bill estimate** (no AI, works offline): units from the same month last year adjusted by the recent trend, else recent months, else this bill; or, with *Check with today's meter reading*, a projection from actual daily use since the bill's reading date. The amount scales the official energy cost by the bill's own total-to-energy ratio. Warns before the 200-unit limit with a daily-units budget. `lib/domain/forecaster.dart`.
+- **Ask about this bill**: a chat helper (Gemini through Firebase AI Logic) grounded in the bill's validated numbers, the app's findings, the estimate, tariff facts and the glossary (`lib/domain/chat_prompt.dart`). Answers in the app language, short and simple, with voice; stays on electricity topics, never invents numbers, never says a bill is definitely wrong. Nothing is stored; max 20 questions per chat.
+
 **Key principle:** AI only reads the image. The rules engine on the phone makes every judgement and fills every number into fixed templates.
 
 ## Changes from the SRS
