@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Voice typing in the bill helper; asked on first tap of the mic. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="Bill Samjho"
         android:name="${applicationName}"
@@ -52,6 +54,10 @@
         <!-- flutter_tts -->
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE"/>
+        </intent>
+        <!-- speech_to_text: the phone's speech recognizer -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
         </intent>
         <!-- url_launcher: call 118, Play Store link -->
         <intent>
