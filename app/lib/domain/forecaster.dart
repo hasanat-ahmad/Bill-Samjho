@@ -9,6 +9,21 @@ import 'rules_engine.dart';
 /// What the next-bill estimate is based on, most reliable first.
 enum ForecastBasis { meterReading, lastYear, recentMonths, thisBill }
 
+/// Why today's meter reading cannot be used for an estimate.
+enum MeterProblem {
+  /// Lower than the reading printed on the bill.
+  belowBill,
+
+  /// Taken the same day as the bill's reading.
+  tooSoon,
+
+  /// More than two months after the bill's reading: add a newer bill.
+  tooOld,
+
+  /// The bill shows no reading date or due date to count days from.
+  noDate,
+}
+
 class BillForecast {
   const BillForecast({
     required this.month,
@@ -63,6 +78,9 @@ class Forecaster {
   final RulesEngine _engine;
 
   static const daysPerBill = 30;
+
+  /// Today's date; tests replace it.
+  static DateTime Function() now = DateTime.now;
 
   /// Unit counts for [BillForecast.amountsByUnits].
   static final whatIfUnits = List<int>.unmodifiable([for (var u = 10; u <= 300; u += 10) u, 350, 400, 500]);
@@ -159,15 +177,26 @@ class Forecaster {
     return (now / then).clamp(0.7, 1.4);
   }
 
+  static const maxMeterDays = 60;
+
+  /// Why [reading] cannot give an estimate from this bill, or null if it can.
+  /// Needs the bill's [ExtractedBill.presentReading].
+  MeterProblem? meterProblem(ExtractedBill bill, int reading, {DateTime? today}) {
+    final present = bill.presentReading;
+    if (present != null && reading < present) return MeterProblem.belowBill;
+    final readOn = _readingDate(bill);
+    if (readOn == null) return MeterProblem.noDate;
+    final days = (today ?? now()).difference(readOn).inDays;
+    if (days < 1) return MeterProblem.tooSoon;
+    if (days > maxMeterDays) return MeterProblem.tooOld;
+    return null;
+  }
+
   /// (estimate, spread, units so far, days) from today's meter reading.
   (double, double, int, int)? _fromMeter(ExtractedBill bill, int? reading, DateTime? today) {
     final present = bill.presentReading;
-    if (reading == null || present == null || reading < present) return null;
-    final readOn = _readingDate(bill);
-    if (readOn == null) return null;
-    final now = today ?? DateTime.now();
-    final days = now.difference(readOn).inDays;
-    if (days < 1 || days > 60) return null;
+    if (reading == null || present == null || meterProblem(bill, reading, today: today) != null) return null;
+    final days = (today ?? now()).difference(_readingDate(bill)!).inDays;
     final soFar = reading - present;
     final estimate = soFar / days * daysPerBill;
     // The more of the month has passed, the surer the projection.

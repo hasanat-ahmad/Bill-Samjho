@@ -188,13 +188,14 @@ class ExtractedBill {
   /// A credit bill: the company owes the consumer, nothing to pay.
   bool get isCredit => totalDue < 0;
 
-  /// Used by the confirm screen when the user corrects units or total.
-  ExtractedBill copyWith({int? units, double? totalDue}) => ExtractedBill(
+  /// Used when the user corrects units or total, or types the meter reading
+  /// the bill did not show.
+  ExtractedBill copyWith({int? units, double? totalDue, int? presentReading}) => ExtractedBill(
         disco: disco,
         referenceNo: referenceNo,
         billMonth: billMonth,
         previousReading: previousReading,
-        presentReading: presentReading,
+        presentReading: presentReading ?? this.presentReading,
         units: units ?? this.units,
         tariffCategory: tariffCategory,
         protectedConsumer: protectedConsumer,
