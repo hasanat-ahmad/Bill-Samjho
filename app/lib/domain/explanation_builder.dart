@@ -45,6 +45,16 @@ class ExplanationBuilder {
     return text;
   }
 
+  /// Short title for a finding, shown before the full sentence.
+  String findingTitle(Finding f) {
+    final key = f.isSummary
+        ? 'summary'
+        : f.ruleId == 'R4' && f.params['source'] == 'bill'
+            ? 'R4_bill'
+            : f.ruleId;
+    return s.t('finding_title_$key', {'limit': f.params['limit'] ?? ''});
+  }
+
   /// Verdict sentence → summary → findings (wrong, check, info).
   String build(Verdict verdict, List<Finding> findings) => [
         verdictSentence(verdict),
