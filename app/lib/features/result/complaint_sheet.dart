@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants.dart';
 import '../../core/i18n.dart';
 import '../../core/theme.dart';
+import '../../core/widgets.dart';
 
 /// S7: pre-filled complaint text with Copy, Share and Call 118 (FR-14).
 Future<void> showComplaintSheet(BuildContext context, String text) => showModalBottomSheet<void>(
@@ -65,71 +66,33 @@ class _ComplaintSheetState extends State<_ComplaintSheet> {
             style: theme.textTheme.bodyLarge,
             decoration: const InputDecoration(counterText: ''),
           ),
-          const SizedBox(height: Gap.lg),
+          const SizedBox(height: Gap.md),
           Row(children: [
-            Expanded(child: _ActionTile(icon: Icons.copy_rounded, label: s.t('copy'), onTap: _copy)),
-            const SizedBox(width: Gap.sm),
             Expanded(
-              child: _ActionTile(
-                icon: Icons.share_rounded,
-                label: s.t('share'),
-                onTap: () => SharePlus.instance.share(ShareParams(text: _text.text)),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.copy_rounded, size: 18),
+                label: Text(s.t('copy')),
+                onPressed: _copy,
               ),
             ),
             const SizedBox(width: Gap.sm),
             Expanded(
-              child: _ActionTile(
-                icon: Icons.call_rounded,
-                label: s.t('call'),
-                color: AppColors.green,
-                background: AppColors.greenSoft,
-                onTap: () => launchUrl(Uri(scheme: 'tel', path: AppConstants.helplineNumber)),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.share_outlined, size: 18),
+                label: Text(s.t('share')),
+                onPressed: () => SharePlus.instance.share(ShareParams(text: _text.text)),
               ),
             ),
           ]),
+          const SizedBox(height: Gap.sm),
+          PrimaryButton(
+            label: s.t('call'),
+            icon: Icons.call_outlined,
+            onPressed: () => launchUrl(Uri(scheme: 'tel', path: AppConstants.helplineNumber)),
+          ),
           const SizedBox(height: Gap.lg),
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Icon(Icons.gavel_rounded, color: AppColors.inkMuted, size: 22),
-            const SizedBox(width: Gap.sm),
-            Expanded(child: Text(s.t('complaint_escalate'), style: theme.textTheme.bodySmall)),
-          ]),
+          NoteRow(icon: Icons.gavel_rounded, text: s.t('complaint_escalate')),
         ]),
-      ),
-    );
-  }
-}
-
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.color = AppColors.primary,
-    this.background = AppColors.primarySoft,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color color;
-  final Color background;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: background,
-      borderRadius: BorderRadius.circular(Radii.md),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(Radii.md),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: Gap.md, horizontal: Gap.xs),
-          child: Column(children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: Gap.sm),
-            Text(label, textAlign: TextAlign.center, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color)),
-          ]),
-        ),
       ),
     );
   }
