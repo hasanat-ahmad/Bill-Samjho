@@ -11,6 +11,7 @@ import '../../core/widgets.dart';
 import '../../data/bill_chat.dart';
 import '../../data/bill_repository.dart';
 import '../../data/models/bill.dart';
+import '../../data/models/extracted_bill.dart';
 import '../../data/models/finding.dart';
 import '../../domain/explanation_builder.dart';
 import '../../domain/forecaster.dart';
@@ -34,6 +35,19 @@ class ResultScreen extends StatefulWidget {
 class _ResultScreenState extends State<ResultScreen> {
   late final TtsService _tts;
   bool _showTtsTip = false;
+
+  /// Next-bill estimate input: the bill (with the reading the user typed if
+  /// the bill had none) and today's meter reading. Null until asked.
+  MeterInput? _meter;
+
+  Future<void> _estimate(Bill bill) async {
+    final result = await showMeterSheet(
+      context,
+      bill: _meter?.bill ?? bill.data,
+      forecaster: Forecaster(context.read<BillRepository>().tariffConfig),
+    );
+    if (result != null && mounted) setState(() => _meter = result);
+  }
 
   @override
   void initState() {
@@ -72,11 +86,19 @@ class _ResultScreenState extends State<ResultScreen> {
           );
         }
         final builder = ExplanationBuilder(s);
-        final findings = ExplanationBuilder.ordered(bill.findings);
         final repo = context.read<BillRepository>();
         // Estimate only from a meter's latest bill.
         final isLatest = repo.latestBill(bill.connectionId)?.id == bill.id;
         final canChat = context.read<ChatAvailability>().enabled;
+        final canComplain = bill.verdict != Verdict.normal;
+        final meter = _meter;
+        final forecast = meter == null || !isLatest
+            ? null
+            : Forecaster(repo.tariffConfig).forecast(
+                meter.bill,
+                repo.billsFor(bill.connectionId).where((b) => b.id != bill.id).toList(),
+                meterReading: meter.reading,
+              );
 
         return Scaffold(
           appBar: AppBar(title: Text(state.connection?.nickname ?? s.t('app_name'))),
@@ -89,44 +111,62 @@ class _ResultScreenState extends State<ResultScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   if (_showTtsTip) ...[
                     _TtsTip(onClose: () => setState(() => _showTtsTip = false)),
-                    const SizedBox(height: Gap.lg),
+                    const SizedBox(height: Gap.md),
                   ],
-                  _VerdictHero(bill: bill),
-                  const SizedBox(height: Gap.lg),
-                  _AmountCard(bill: bill),
-                  const SizedBox(height: Gap.lg),
-                  ListenButton(id: 'all', text: builder.build(bill.verdict, bill.findings), label: s.t('listen_all')),
-                  _MeterSection(units: bill.data.units),
-                  if (isLatest)
-                    _ForecastSection(
-                      bill: bill,
-                      past: repo.billsFor(bill.connectionId).where((b) => b.id != bill.id).toList(),
-                    ),
+                  _Summary(bill: bill),
+                  const SizedBox(height: Gap.sm + 2),
+                  _ListenAll(text: builder.build(bill.verdict, bill.findings)),
+                  if (_Charges.hasBreakdown(bill.data)) ...[
+                    SectionTitle(s.t('charges_title')),
+                    _Charges(data: bill.data),
+                  ],
                   SectionTitle(s.t('findings_title')),
-                  for (final f in findings) ...[
-                    _FindingCard(finding: f, text: builder.findingText(f)),
-                    const SizedBox(height: Gap.md),
+                  _Findings(findings: ExplanationBuilder.ordered(bill.findings), builder: builder),
+                  if (forecast != null) ...[
+                    SectionTitle(s.t('forecast_title')),
+                    _ForecastResult(forecast: forecast, onChange: () => _estimate(bill)),
                   ],
-                  if (canChat) ...[
-                    const SizedBox(height: Gap.sm),
-                    _AskCard(onPressed: () => context.push('/chat/${bill.id}')),
-                    const SizedBox(height: Gap.md),
-                  ],
-                  if (bill.verdict != Verdict.normal) ...[
-                    const SizedBox(height: Gap.sm),
-                    _ComplaintCard(
-                      onPressed: () => showComplaintSheet(
-                        context,
-                        builder.complaint(bill, referenceNo: state.connection?.referenceNo),
-                      ),
-                    ),
-                  ],
+                  SectionTitle(s.t('next_steps')),
+                  AppCard(
+                    padding: EdgeInsets.zero,
+                    child: Column(children: [
+                      for (final (i, tile) in [
+                        if (isLatest && forecast == null)
+                          PanelTile(
+                            icon: Icons.speed_outlined,
+                            iconColor: AppColors.primary,
+                            title: s.t('forecast_cta'),
+                            subtitle: s.t('forecast_intro'),
+                            onTap: () => _estimate(bill),
+                          ),
+                        if (canChat)
+                          PanelTile(
+                            icon: Icons.forum_outlined,
+                            iconColor: AppColors.primary,
+                            title: s.t('chat_entry_title'),
+                            subtitle: s.t('chat_entry_body'),
+                            onTap: () => context.push('/chat/${bill.id}'),
+                          ),
+                        if (canComplain)
+                          PanelTile(
+                            icon: Icons.campaign_outlined,
+                            iconColor: AppColors.red,
+                            title: s.t('complain'),
+                            titleColor: AppColors.redInk,
+                            subtitle: s.t('complain_body'),
+                            onTap: () => showComplaintSheet(
+                              context,
+                              builder.complaint(bill, referenceNo: state.connection?.referenceNo),
+                            ),
+                          ),
+                      ].indexed) ...[
+                        if (i > 0) const PanelDivider(indent: 54),
+                        tile,
+                      ],
+                    ]),
+                  ),
                   const SizedBox(height: Gap.xl),
-                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const Icon(Icons.info_outline_rounded, color: AppColors.inkMuted, size: 18),
-                    const SizedBox(width: Gap.sm),
-                    Expanded(child: Text(s.t('advice_only'), style: Theme.of(context).textTheme.bodySmall)),
-                  ]),
+                  NoteRow(icon: Icons.info_outline_rounded, text: s.t('advice_only')),
                 ]),
               ),
             ],
@@ -137,8 +177,9 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 }
 
-class _VerdictHero extends StatelessWidget {
-  const _VerdictHero({required this.bill});
+/// Verdict first, then the amount, key facts and the 200-unit meter.
+class _Summary extends StatelessWidget {
+  const _Summary({required this.bill});
 
   final Bill bill;
 
@@ -146,171 +187,290 @@ class _VerdictHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.s;
     final theme = Theme.of(context);
-    final tone = Tone.ofVerdict(bill.verdict);
     final builder = ExplanationBuilder(s);
-    return Semantics(
-      container: true,
-      label: '${builder.verdictLabel(bill.verdict)}. ${builder.verdictSentence(bill.verdict)}',
-      excludeSemantics: true,
-      child: Container(
-        padding: const EdgeInsets.all(Gap.lg),
-        decoration: BoxDecoration(
-          color: tone.soft,
-          borderRadius: BorderRadius.circular(Radii.lg),
-          border: Border.all(color: tone.color.withValues(alpha: 0.35)),
-        ),
-        child: Row(children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(color: tone.color, shape: BoxShape.circle),
-            child: Icon(tone.icon, color: Colors.white, size: 30),
-          ),
-          const SizedBox(width: Gap.lg),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(builder.verdictLabel(bill.verdict), style: theme.textTheme.headlineSmall?.copyWith(color: tone.ink)),
-              const SizedBox(height: Gap.xs),
-              Text(builder.verdictSentence(bill.verdict), style: theme.textTheme.bodyLarge?.copyWith(color: tone.ink)),
-            ]),
-          ),
-        ]),
-      ),
-    );
-  }
-}
+    final data = bill.data;
+    final config = context.read<BillRepository>().tariffConfig;
+    final limit = config.protectedLimitUnits;
+    final meter = UnitMeter(units: data.units, limit: limit, nearLimit: config.nearLimitUnits);
+    final heading = [formatMonth(data.billMonth, s), ?data.disco].join(' · ');
+    final left = limit - data.units;
 
-class _AmountCard extends StatelessWidget {
-  const _AmountCard({required this.bill});
-
-  final Bill bill;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.s;
-    final theme = Theme.of(context);
     return AppCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(s.t(bill.data.isCredit ? 'credit_due' : 'amount_due'), style: theme.textTheme.bodySmall),
-        const SizedBox(height: Gap.xs),
-        Text(
-          formatAmount(bill.data.totalDue, s),
-          style: numberStyle(30, weight: FontWeight.w800, color: bill.data.isCredit ? AppColors.greenInk : AppColors.ink),
-        ),
-        const SizedBox(height: Gap.md),
-        Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
-          _Chip(icon: Icons.calendar_month_rounded, text: formatMonth(bill.data.billMonth, s)),
-          _Chip(icon: Icons.bolt_rounded, text: '${formatNumber(bill.data.units)} ${s.t('units')}'),
-          if (bill.data.dueDate != null)
-            _Chip(icon: Icons.event_rounded, text: s.t('due_by', {'date': formatDate(bill.data.dueDate!, s)})),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(child: Text(heading, style: theme.textTheme.bodySmall)),
+          VerdictPill(bill.verdict),
         ]),
+        const SizedBox(height: Gap.md),
+        Semantics(
+          label: '${builder.verdictLabel(bill.verdict)}. ${builder.verdictSentence(bill.verdict)}',
+          excludeSemantics: true,
+          child: Text(builder.verdictSentence(bill.verdict), style: theme.textTheme.titleLarge),
+        ),
+        const SizedBox(height: Gap.lg),
+        Text(s.t(data.isCredit ? 'credit_due' : 'amount_due'), style: theme.textTheme.bodySmall),
+        const SizedBox(height: 2),
+        Text(
+          formatAmount(data.totalDue, s),
+          style: numberStyle(34, weight: FontWeight.w700, letterSpacing: -0.6, color: data.isCredit ? AppColors.greenInk : AppColors.ink),
+        ),
+        const SizedBox(height: Gap.lg),
+        const Divider(),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: Gap.md),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: _Fact(label: s.t('units_label'), value: formatNumber(data.units))),
+            if (data.dueDate != null)
+              Expanded(child: _Fact(label: s.t('due_date'), value: formatDate(data.dueDate!, s), end: true)),
+          ]),
+        ),
+        const Divider(),
+        const SizedBox(height: Gap.md),
+        Row(children: [
+          Expanded(
+            child: Text(
+              [
+                s.t('units_of_limit', {'units': formatNumber(data.units), 'limit': formatNumber(limit)}),
+                if (left > 0) s.t('units_left', {'left': formatNumber(left)}),
+              ].join(' · '),
+              style: theme.textTheme.titleSmall,
+            ),
+          ),
+          Icon(meter.tone.icon, color: meter.tone.color, size: 18),
+        ]),
+        const SizedBox(height: Gap.sm),
+        meter,
       ]),
     );
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({required this.icon, required this.text});
+class _Fact extends StatelessWidget {
+  const _Fact({required this.label, required this.value, this.end = false});
 
-  final IconData icon;
-  final String text;
+  final String label;
+  final String value;
+
+  /// Aligned to the end edge (the second of two facts).
+  final bool end;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.xs + 2),
-        decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(Radii.sm)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 16, color: AppColors.primary),
-          const SizedBox(width: Gap.xs),
-          Flexible(child: Text(text, style: Theme.of(context).textTheme.labelMedium)),
-        ]),
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: end ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 2),
+          Text(value, style: numberStyle(15.5)),
+        ],
       );
 }
 
-class _MeterSection extends StatelessWidget {
-  const _MeterSection({required this.units});
+/// Full-width "Listen to explanation" right under the summary, so people who
+/// prefer listening find it first.
+class _ListenAll extends StatelessWidget {
+  const _ListenAll({required this.text});
 
-  final int units;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.s;
-    final theme = Theme.of(context);
-    final config = context.read<BillRepository>().tariffConfig;
-    final limit = config.protectedLimitUnits;
-    final text = ExplanationBuilder(s).meterText(units, limit);
-    final meter = UnitMeter(units: units, limit: limit, nearLimit: config.nearLimitUnits, height: 12, showScale: true);
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SectionTitle(s.t('meter_title', {'limit': formatNumber(limit)})),
-      AppCard(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            Icon(meter.tone.icon, color: meter.tone.color, size: 22),
-            const SizedBox(width: Gap.sm),
-            Expanded(
-              child: Text(
-                s.t('units_of_limit', {'units': formatNumber(units), 'limit': formatNumber(limit)}),
-                style: theme.textTheme.titleMedium,
-              ),
-            ),
-            PlayButton(id: 'meter', text: text, tone: meter.tone),
-          ]),
-          const SizedBox(height: Gap.md),
-          meter,
-          const SizedBox(height: Gap.md),
-          Text(text, style: theme.textTheme.bodyMedium),
-        ]),
-      ),
-    ]);
-  }
-}
-
-class _FindingCard extends StatelessWidget {
-  const _FindingCard({required this.finding, required this.text});
-
-  final Finding finding;
   final String text;
 
   @override
   Widget build(BuildContext context) {
-    final tone = finding.isSummary ? Tone.info : Tone.ofSeverity(finding.severity);
-    final icon = finding.isSummary ? Icons.receipt_long_rounded : tone.icon;
-    return AppCard(
-      padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.lg, Gap.sm, Gap.lg),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        IconBadge(icon, color: tone.color, background: tone.soft, size: 36),
-        const SizedBox(width: Gap.md),
-        Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyLarge)),
-        PlayButton(id: finding.ruleId, text: text, tone: tone),
-      ]),
+    final tts = context.read<TtsService>();
+    final s = context.s;
+    return ValueListenableBuilder<String?>(
+      valueListenable: tts.playing,
+      builder: (context, playing, _) {
+        final isPlaying = playing == 'all';
+        return FilledButton.tonalIcon(
+          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+          icon: Icon(isPlaying ? Icons.stop_circle_rounded : Icons.play_circle_rounded, size: 22),
+          label: Text(isPlaying ? s.t('stop') : s.t('listen_all')),
+          onPressed: () {
+            HapticFeedback.selectionClick();
+            tts.toggle('all', text);
+          },
+        );
+      },
     );
   }
 }
 
-class _ComplaintCard extends StatelessWidget {
-  const _ComplaintCard({required this.onPressed});
+/// Line items from the bill, adding up to the total. The info icon explains
+/// a line in plain words (from the glossary).
+class _Charges extends StatelessWidget {
+  const _Charges({required this.data});
 
-  final VoidCallback onPressed;
+  final ExtractedBill data;
+
+  /// Worth showing only with the cost of electricity and at least one other
+  /// line; a credit bill has no breakdown to explain.
+  static bool hasBreakdown(ExtractedBill d) =>
+      !d.isCredit && d.energyCharges != null && _lines(d).length > 1;
+
+  /// (label key, amount, glossary code) for each line the bill shows.
+  static List<(String, double, String?)> _lines(ExtractedBill d) => [
+        for (final (key, amount, code) in [
+          ('charge_energy', d.energyCharges, null),
+          ('charge_fixed', d.fixedCharges, 'Fixed'),
+          ('charge_fpa', d.fpa, 'FPA'),
+          ('charge_qtr', d.qtrAdjustment, 'QTR'),
+          ('charge_gst', d.gst, 'GST'),
+          ('charge_income_tax', d.incomeTax, null),
+          ('charge_ed', d.electricityDuty, 'ED'),
+          ('charge_tv', d.tvFee, 'PTV Fee'),
+          ('charge_arrears', d.arrears, 'Arrears'),
+        ])
+          if (amount != null && amount != 0) (key, amount, code),
+      ];
 
   @override
   Widget build(BuildContext context) {
     final s = context.s;
     final theme = Theme.of(context);
+    final lines = _lines(data);
+    // Whatever the listed lines do not explain (rounding, other surcharges).
+    final other = data.totalDue - lines.fold<double>(0, (sum, l) => sum + l.$2);
+    final rows = [
+      for (final (key, amount, code) in lines)
+        (s.t(key, {'units': formatNumber(data.units)}), amount, code),
+      if (other.abs() >= 1) (s.t('charge_other'), other, null),
+    ];
+
     return AppCard(
-      color: AppColors.redSoft,
-      borderColor: AppColors.red.withValues(alpha: 0.25),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          const IconBadge(Icons.campaign_rounded, color: AppColors.red, background: Colors.white),
-          const SizedBox(width: Gap.md),
-          Expanded(child: Text(s.t('complain_title'), style: theme.textTheme.titleMedium?.copyWith(color: AppColors.redInk))),
-        ]),
-        const SizedBox(height: Gap.sm),
-        Text(s.t('complain_body'), style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.redInk)),
-        const SizedBox(height: Gap.lg),
-        PrimaryButton(label: s.t('complain'), icon: Icons.edit_note_rounded, color: AppColors.red, onPressed: onPressed),
+      padding: EdgeInsets.zero,
+      child: Column(children: [
+        for (final (i, (label, amount, code)) in rows.indexed) ...[
+          if (i > 0) const PanelDivider(),
+          // Same height with or without the info button, so amounts line up.
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.xs, Gap.lg, Gap.xs),
+              child: Row(children: [
+                Expanded(
+                  child: Row(children: [
+                    Flexible(child: Text(label, style: theme.textTheme.bodyLarge)),
+                    if (code != null)
+                      IconButton(
+                        tooltip: s.t('what_is_this'),
+                        iconSize: 18,
+                        color: AppColors.inkSubtle,
+                        icon: const Icon(Icons.info_outline_rounded),
+                        onPressed: () => _explain(context, code),
+                      ),
+                  ]),
+                ),
+                const SizedBox(width: Gap.md),
+                Text(formatAmount(amount, s), style: numberStyle(15.5)),
+              ]),
+            ),
+          ),
+        ],
+        Container(
+          decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.ink, width: 1.2))),
+          margin: const EdgeInsets.symmetric(horizontal: Gap.lg),
+          padding: const EdgeInsets.symmetric(vertical: Gap.md + 2),
+          child: Row(children: [
+            Expanded(child: Text(s.t('charge_total'), style: theme.textTheme.titleMedium)),
+            Text(formatAmount(data.totalDue, s), style: numberStyle(16.5, weight: FontWeight.w700)),
+          ]),
+        ),
       ]),
     );
+  }
+
+  void _explain(BuildContext context, String code) {
+    final s = context.read<AppStrings>();
+    final item = s.glossary.where((g) => g.code == code).firstOrNull;
+    if (item == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(Gap.page, 0, Gap.xs, Gap.xl),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(item.title, style: Theme.of(sheetContext).textTheme.titleLarge),
+              const SizedBox(height: Gap.sm),
+              Text(item.meaning, style: Theme.of(sheetContext).textTheme.bodyLarge),
+            ]),
+          ),
+          PlayButton(id: 'glossary_${item.code}', text: '${item.title}. ${item.meaning}'),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Findings as short titles that open to the full sentence. The most serious
+/// one starts open.
+class _Findings extends StatefulWidget {
+  const _Findings({required this.findings, required this.builder});
+
+  final List<Finding> findings;
+  final ExplanationBuilder builder;
+
+  @override
+  State<_Findings> createState() => _FindingsState();
+}
+
+class _FindingsState extends State<_Findings> {
+  late final Set<Finding> _open = {
+    widget.findings.where((f) => !f.isSummary).firstOrNull ?? widget.findings.first,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final builder = widget.builder;
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(children: [
+        for (final (i, f) in widget.findings.indexed) ...[
+          if (i > 0) const PanelDivider(indent: 50),
+          _finding(f, theme, builder),
+        ],
+      ]),
+    );
+  }
+
+  Widget _finding(Finding f, ThemeData theme, ExplanationBuilder builder) {
+    final open = _open.contains(f);
+    final text = builder.findingText(f);
+    final icon = f.isSummary
+        ? const Icon(Icons.receipt_long_outlined, color: AppColors.inkMuted, size: 20)
+        : Icon(Tone.ofSeverity(f.severity).icon, color: Tone.ofSeverity(f.severity).color, size: 20);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Semantics(
+        button: true,
+        expanded: open,
+        child: InkWell(
+          onTap: () => setState(() => open ? _open.remove(f) : _open.add(f)),
+          child: Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.md + 2, Gap.md, Gap.md + 2),
+            child: Row(children: [
+              icon,
+              const SizedBox(width: Gap.md + 2),
+              Expanded(child: Text(builder.findingTitle(f), style: theme.textTheme.titleSmall)),
+              Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: AppColors.inkSubtle),
+            ]),
+          ),
+        ),
+      ),
+      if (open)
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(50, 0, Gap.xs, Gap.sm),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: Gap.sm),
+                child: Text(text, style: theme.textTheme.bodyLarge),
+              ),
+            ),
+            PlayButton(id: f.ruleId, text: text),
+          ]),
+        ),
+    ]);
   }
 }
 
@@ -324,22 +484,24 @@ class _TtsTip extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.s;
     return AppCard(
-      color: AppColors.primarySoft,
-      borderColor: AppColors.primarySoft,
-      padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.sm, Gap.xs, Gap.lg),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.xs, Gap.xs, Gap.sm),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          const Icon(Icons.record_voice_over_rounded, color: AppColors.primaryDark, size: 22),
+          const Icon(Icons.record_voice_over_outlined, color: AppColors.inkMuted, size: 20),
           const SizedBox(width: Gap.md),
           Expanded(child: Text(s.t('tts_tip'), style: Theme.of(context).textTheme.bodyLarge)),
-          IconButton(tooltip: s.t('cancel'), icon: const Icon(Icons.close_rounded), onPressed: onClose),
+          IconButton(
+            tooltip: s.t('cancel'),
+            color: AppColors.inkSubtle,
+            icon: const Icon(Icons.close_rounded, size: 20),
+            onPressed: onClose,
+          ),
         ]),
         Padding(
-          padding: const EdgeInsetsDirectional.only(end: Gap.md),
-          child: FilledButton.icon(
-            icon: const Icon(Icons.download_rounded),
-            label: Text(s.t('install')),
+          padding: const EdgeInsetsDirectional.only(start: Gap.xxl - 2),
+          child: TextButton(
             onPressed: () => launchUrl(Uri.parse(AppConstants.googleTtsPlayStoreUrl), mode: LaunchMode.externalApplication),
+            child: Text(s.t('install')),
           ),
         ),
       ]),
@@ -347,179 +509,189 @@ class _TtsTip extends StatelessWidget {
   }
 }
 
-/// Next-bill estimate, with an optional check against today's meter reading.
-class _ForecastSection extends StatefulWidget {
-  const _ForecastSection({required this.bill, required this.past});
+class _ForecastResult extends StatelessWidget {
+  const _ForecastResult({required this.forecast, required this.onChange});
 
-  final Bill bill;
-  final List<Bill> past;
-
-  @override
-  State<_ForecastSection> createState() => _ForecastSectionState();
-}
-
-class _ForecastSectionState extends State<_ForecastSection> {
-  int? _meterReading;
-
-  Future<void> _askMeterReading() async {
-    final s = context.read<AppStrings>();
-    final last = widget.bill.data.presentReading!;
-    final reading = await showDialog<int>(
-      context: context,
-      builder: (context) => _MeterDialog(lastReading: last, s: s),
-    );
-    if (reading != null && mounted) setState(() => _meterReading = reading);
-  }
+  final BillForecast forecast;
+  final VoidCallback onChange;
 
   @override
   Widget build(BuildContext context) {
     final s = context.s;
     final theme = Theme.of(context);
-    final forecast = Forecaster(context.read<BillRepository>().tariffConfig)
-        .forecast(widget.bill.data, widget.past, meterReading: _meterReading);
-    if (forecast == null) return const SizedBox.shrink();
     final builder = ExplanationBuilder(s);
     final tone = forecast.overLimit ? Tone.wrong : forecast.mayCrossLimit ? Tone.check : Tone.normal;
     final hasAmount = forecast.amountLow != null && forecast.amountHigh != null;
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      SectionTitle(s.t('forecast_title')),
-      AppCard(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Row(children: [
-            const IconBadge(Icons.insights_rounded, color: AppColors.primary, background: AppColors.primarySoft, size: 36),
-            const SizedBox(width: Gap.md),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(formatMonth(forecast.month, s), style: theme.textTheme.bodySmall),
-                Text(
-                  s.t('forecast_units', {'units': formatNumber(forecast.units)}),
-                  style: theme.textTheme.titleMedium,
-                ),
-              ]),
-            ),
-            PlayButton(id: 'forecast', text: builder.forecastText(forecast), tone: tone),
-          ]),
-          if (hasAmount) ...[
-            const SizedBox(height: Gap.sm),
-            Text(
-              '${formatAmount(forecast.amountLow!, s)} – ${formatAmount(forecast.amountHigh!, s)}',
-              style: numberStyle(22),
-            ),
-          ],
-          const SizedBox(height: Gap.xs),
-          Text(builder.forecastBasis(forecast), style: theme.textTheme.bodySmall),
-          const SizedBox(height: Gap.md),
-          Container(
-            padding: const EdgeInsets.all(Gap.md),
-            decoration: BoxDecoration(color: tone.soft, borderRadius: BorderRadius.circular(Radii.sm)),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Icon(tone.icon, color: tone.color, size: 20),
-              const SizedBox(width: Gap.sm),
-              Expanded(
-                child: Text(builder.forecastAdvice(forecast), style: theme.textTheme.bodyMedium?.copyWith(color: tone.ink)),
-              ),
+    return AppCard(
+      padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.sm, Gap.xs, Gap.sm),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(formatMonth(forecast.month, s), style: theme.textTheme.bodySmall),
+              Text(s.t('forecast_units', {'units': formatNumber(forecast.units)}), style: theme.textTheme.titleMedium),
             ]),
           ),
-          if (widget.bill.data.presentReading != null) ...[
+          PlayButton(id: 'forecast', text: builder.forecastText(forecast)),
+        ]),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(end: Gap.md),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            if (hasAmount) ...[
+              const SizedBox(height: Gap.sm),
+              Text(
+                '${formatAmount(forecast.amountLow!, s)} – ${formatAmount(forecast.amountHigh!, s)}',
+                style: numberStyle(24, weight: FontWeight.w700, letterSpacing: -0.3),
+              ),
+            ],
+            const SizedBox(height: Gap.xs),
+            Text(builder.forecastBasis(forecast), style: theme.textTheme.bodySmall),
+            const SizedBox(height: Gap.md),
+            Container(
+              padding: const EdgeInsets.all(Gap.md),
+              decoration: BoxDecoration(color: tone.soft, borderRadius: BorderRadius.circular(Radii.sm)),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Padding(padding: const EdgeInsets.only(top: 1), child: Icon(tone.icon, color: tone.color, size: 18)),
+                const SizedBox(width: Gap.sm),
+                Expanded(child: Text(builder.forecastAdvice(forecast), style: theme.textTheme.bodyMedium?.copyWith(color: tone.ink))),
+              ]),
+            ),
             const SizedBox(height: Gap.sm),
+            Text(s.t('forecast_disclaimer'), style: theme.textTheme.bodySmall?.copyWith(color: AppColors.inkSubtle)),
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: TextButton.icon(
-                icon: const Icon(Icons.speed_rounded, size: 20),
-                label: Text(s.t('forecast_meter')),
-                onPressed: _askMeterReading,
+                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: Gap.xs)),
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                label: Text(s.t('forecast_change')),
+                onPressed: onChange,
               ),
             ),
-          ],
-          Text(s.t('forecast_disclaimer'), style: theme.textTheme.bodySmall),
-        ]),
-      ),
-    ]);
+          ]),
+        ),
+      ]),
+    );
   }
 }
 
-class _MeterDialog extends StatefulWidget {
-  const _MeterDialog({required this.lastReading, required this.s});
+/// The meter reading the user typed, and the bill to estimate from (with the
+/// bill's own reading filled in if the bill did not show one).
+typedef MeterInput = ({ExtractedBill bill, int reading});
 
-  final int lastReading;
+/// Asks for today's meter reading (and the bill's, if the bill had none).
+/// Returns null if dismissed.
+Future<MeterInput?> showMeterSheet(BuildContext context, {required ExtractedBill bill, required Forecaster forecaster}) =>
+    showModalBottomSheet<MeterInput>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => _MeterSheet(bill: bill, forecaster: forecaster, s: context.read<AppStrings>()),
+    );
+
+class _MeterSheet extends StatefulWidget {
+  const _MeterSheet({required this.bill, required this.forecaster, required this.s});
+
+  final ExtractedBill bill;
+  final Forecaster forecaster;
   final AppStrings s;
 
   @override
-  State<_MeterDialog> createState() => _MeterDialogState();
+  State<_MeterSheet> createState() => _MeterSheetState();
 }
 
-class _MeterDialogState extends State<_MeterDialog> {
-  final _value = TextEditingController();
-  String? _error;
+class _MeterSheetState extends State<_MeterSheet> {
+  final _today = TextEditingController();
+  final _onBill = TextEditingController();
+  String? _todayError, _billError;
+
+  /// Largest believable use since the bill (about 2 months of a big house).
+  static const _maxJump = 5000;
+
+  bool get _billHasReading => widget.bill.presentReading != null;
 
   @override
   void dispose() {
-    _value.dispose();
+    _today.dispose();
+    _onBill.dispose();
     super.dispose();
   }
 
-  void _apply() {
-    final n = int.tryParse(_value.text);
-    if (n == null || n < widget.lastReading || n > widget.lastReading + 5000) {
-      setState(() => _error = widget.s.t('forecast_meter_invalid', {'reading': '${widget.lastReading}'}));
+  void _submit() {
+    final s = widget.s;
+    final onBill = _billHasReading ? widget.bill.presentReading : int.tryParse(_onBill.text);
+    final today = int.tryParse(_today.text);
+    setState(() {
+      _billError = onBill == null ? s.t('forecast_enter_number') : null;
+      _todayError = today == null ? s.t('forecast_enter_number') : null;
+    });
+    if (onBill == null || today == null) return;
+
+    final bill = _billHasReading ? widget.bill : widget.bill.copyWith(presentReading: onBill);
+    final problem = widget.forecaster.meterProblem(bill, today);
+    final error = switch (problem) {
+      MeterProblem.belowBill => s.t('forecast_meter_invalid', {'reading': '$onBill'}),
+      MeterProblem.tooSoon => s.t('forecast_too_soon'),
+      MeterProblem.tooOld => s.t('forecast_too_old'),
+      MeterProblem.noDate => s.t('forecast_no_date'),
+      null => today - onBill > _maxJump ? s.t('forecast_too_big') : null,
+    };
+    if (error != null) {
+      setState(() => _todayError = error);
       return;
     }
-    Navigator.pop(context, n);
+    HapticFeedback.lightImpact();
+    Navigator.pop(context, (bill: bill, reading: today));
   }
 
   @override
   Widget build(BuildContext context) {
     final s = widget.s;
-    return AlertDialog(
-      icon: const Icon(Icons.speed_rounded, color: AppColors.primary, size: 32),
-      title: Text(s.t('forecast_meter_title')),
-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text(s.t('forecast_meter_last', {'reading': '${widget.lastReading}'}), style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: Gap.md),
-        TextField(
-          controller: _value,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          textDirection: TextDirection.ltr,
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(9)],
-          style: numberStyle(22),
-          decoration: InputDecoration(hintText: s.t('forecast_meter_hint'), errorText: _error),
-          onSubmitted: (_) => _apply(),
-        ),
-      ]),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(s.t('cancel'))),
-        FilledButton(onPressed: _apply, child: Text(s.t('forecast_meter_apply'))),
-      ],
-    );
-  }
-}
-
-class _AskCard extends StatelessWidget {
-  const _AskCard({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = context.s;
     final theme = Theme.of(context);
-    return AppCard(
-      color: AppColors.primarySoft,
-      borderColor: AppColors.primarySoft,
-      onTap: onPressed,
-      child: Row(children: [
-        const IconBadge(Icons.forum_rounded, color: AppColors.primary, background: Colors.white),
-        const SizedBox(width: Gap.md),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(s.t('chat_entry_title'), style: theme.textTheme.titleMedium?.copyWith(color: AppColors.primaryDark)),
-            Text(s.t('chat_entry_body'), style: theme.textTheme.bodySmall),
-          ]),
-        ),
-        const Icon(Icons.chevron_right_rounded, color: AppColors.primaryDark),
-      ]),
+    Widget field(TextEditingController c, String label, String? error, {bool autofocus = false}) => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(label, style: theme.textTheme.titleSmall),
+            const SizedBox(height: Gap.sm),
+            TextField(
+              controller: c,
+              autofocus: autofocus,
+              keyboardType: TextInputType.number,
+              textDirection: TextDirection.ltr,
+              inputFormatters: [WesternDigitsFormatter(), LengthLimitingTextInputFormatter(8)],
+              style: numberStyle(22),
+              decoration: InputDecoration(hintText: s.t('forecast_meter_hint'), errorText: error),
+              onSubmitted: (_) => _submit(),
+            ),
+          ],
+        );
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(Gap.page, 0, Gap.page, Gap.xl),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text(s.t('forecast_cta'), style: theme.textTheme.titleLarge),
+          const SizedBox(height: Gap.xs),
+          Text(s.t('forecast_reading_note'), style: theme.textTheme.bodyMedium),
+          const SizedBox(height: Gap.lg),
+          if (_billHasReading)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.md),
+              decoration: BoxDecoration(color: AppColors.canvas, borderRadius: BorderRadius.circular(Radii.sm)),
+              child: Row(children: [
+                Expanded(child: Text(s.t('forecast_bill_reading'), style: theme.textTheme.bodyMedium)),
+                Text('${widget.bill.presentReading}', style: numberStyle(16)),
+              ]),
+            )
+          else
+            field(_onBill, s.t('forecast_bill_reading'), _billError, autofocus: true),
+          const SizedBox(height: Gap.lg),
+          field(_today, s.t('forecast_meter_title'), _todayError, autofocus: _billHasReading),
+          const SizedBox(height: Gap.xl),
+          PrimaryButton(label: s.t('forecast_meter_apply'), onPressed: _submit),
+        ]),
+      ),
     );
   }
 }

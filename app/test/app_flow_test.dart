@@ -8,6 +8,7 @@ import 'package:bill_samjho/data/bill_chat.dart';
 import 'package:bill_samjho/data/bill_repository.dart';
 import 'package:bill_samjho/data/local_store.dart';
 import 'package:bill_samjho/data/models/tariff_config.dart';
+import 'package:bill_samjho/domain/forecaster.dart';
 import 'package:bill_samjho/services/scan_service.dart';
 import 'package:bill_samjho/services/tts_service.dart';
 import 'package:flutter/foundation.dart';
@@ -134,11 +135,25 @@ void main() {
     // Tap 3: confirm → S6 result.
     await tapAsync(tester, find.text('Looks right'));
     expect(find.text('Listen to explanation'), findsOneWidget);
-    expect(find.text('Rs 7,233'), findsOneWidget);
+    expect(find.text('Rs 7,233'), findsWidgets); // amount due, and the charges total
     // Sample history has July at 212 units → protected rate lost → "Check this".
     expect(find.text('Check this'), findsOneWidget);
+    expect(find.text('A few things on your bill are worth checking.'), findsOneWidget);
+
+    // Charges add up to the total; the info icon explains a line.
+    await tester.scrollUntilVisible(find.text('Total'), 300);
+    expect(find.text('Cost of electricity (190 units)'), findsOneWidget);
+    expect(find.text('Fuel price adjustment (FPA)'), findsOneWidget);
+
+    // The most serious finding starts open; the others open on tap.
+    await tester.scrollUntilVisible(find.text('Cheaper rate lost'), 300);
+    expect(find.textContaining('you are not getting the cheaper protected rate'), findsOneWidget);
     final summary = find.textContaining('This month you used 190 units');
-    await tester.scrollUntilVisible(summary, 300);
+    expect(summary, findsNothing);
+    await tester.ensureVisible(find.text('Your usage and bill'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Your usage and bill'));
+    await tester.pumpAndSettle();
     expect(summary, findsOneWidget);
 
     // S7 complaint sheet with the reference number.
@@ -229,9 +244,14 @@ void main() {
     await tester.tap(find.text('ستمبر 2026'));
     await tester.pumpAndSettle();
     // The saved bill is explained in Urdu now, from the same stored data.
-    final urduSummary = find.textContaining('اس مہینے آپ نے 186 یونٹ');
-    await tester.scrollUntilVisible(urduSummary, 300);
-    expect(urduSummary, findsOneWidget);
+    final urduTitle = find.text('آپ کا استعمال اور بل');
+    await tester.scrollUntilVisible(urduTitle, 300);
+    await tester.ensureVisible(urduTitle);
+    await tester.pumpAndSettle();
+    await tester.tap(urduTitle);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('اس مہینے آپ نے 186 یونٹ'), findsOneWidget);
+    expect(find.text('چارجز'), findsOneWidget);
   });
 
   testWidgets('reference-number lookup form: validation, saved number, both languages', (tester) async {
@@ -276,7 +296,10 @@ void main() {
     expect(find.text('اپنا بل آن لائن دیکھیں'), findsOneWidget);
   });
 
-  testWidgets('result shows the next-bill estimate and the helper answers a suggested question', (tester) async {
+  testWidgets('estimate from today\'s meter reading on request; the helper answers a suggested question', (tester) async {
+    // Sample bill: reading 18606, due 15 Oct, so read about 20 Sep.
+    Forecaster.now = () => DateTime(2026, 10, 10);
+    addTearDown(() => Forecaster.now = DateTime.now);
     await tester.runAsync(() async {
       await store.setSetting(SettingKeys.onboardingDone, true);
       final c = await repo.addConnection('Home');
@@ -290,10 +313,27 @@ void main() {
     await tester.pumpAndSettle();
 
     final page = find.byType(Scrollable).first;
-    await tester.scrollUntilVisible(find.text('Next bill estimate'), 300, scrollable: page);
+    await tester.scrollUntilVisible(find.text('Estimate next bill'), 300, scrollable: page);
+    expect(find.text('October 2026'), findsNothing); // nothing until the user asks
+    await tester.ensureVisible(find.text('Estimate next bill'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Estimate next bill'));
+    await tester.pumpAndSettle();
+    expect(find.text('Reading on this bill'), findsOneWidget);
+    expect(find.text('18606'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '18500');
+    await tester.tap(find.text('Estimate'));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a number bigger than 18606'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), '18726'); // 120 units in 20 days
+    await tester.tap(find.text('Estimate'));
+    await tester.pumpAndSettle();
     expect(find.text('October 2026'), findsOneWidget);
-    expect(find.textContaining('Based on the same month last year'), findsNothing); // sample history has no Oct 2025
-    expect(find.textContaining('Based on your last few months'), findsOneWidget);
+    expect(find.text('about 180 units'), findsOneWidget);
+    expect(find.textContaining('Based on your meter: 120 units used in 20 days'), findsOneWidget);
+    expect(find.text('Change reading'), findsOneWidget);
 
     await tester.scrollUntilVisible(find.text('Have a question about this bill?'), 300, scrollable: page);
     await tester.ensureVisible(find.text('Have a question about this bill?'));
