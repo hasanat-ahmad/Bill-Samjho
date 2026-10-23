@@ -102,6 +102,23 @@ void main() {
     expect(f.basis, ForecastBasis.thisBill);
   });
 
+  test('says why a meter reading cannot be used', () {
+    final b = bill(units: 106, present: 355, readingDate: '2026-09-19');
+    final day = DateTime(2026, 10, 9);
+    expect(forecaster.meterProblem(b, 455, today: day), isNull);
+    expect(forecaster.meterProblem(b, 300, today: day), MeterProblem.belowBill);
+    expect(forecaster.meterProblem(b, 360, today: DateTime(2026, 9, 19)), MeterProblem.tooSoon);
+    expect(forecaster.meterProblem(b, 900, today: DateTime(2026, 11, 30)), MeterProblem.tooOld);
+    expect(forecaster.meterProblem(bill(units: 106, present: 355), 400, today: day), MeterProblem.noDate);
+  });
+
+  test('a reading the bill did not show can be added before estimating', () {
+    final b = bill(units: 106, readingDate: '2026-09-19').copyWith(presentReading: 355);
+    final f = forecaster.forecast(b, const [], meterReading: 455, today: DateTime(2026, 10, 9))!;
+    expect(f.basis, ForecastBasis.meterReading);
+    expect(f.units, 150);
+  });
+
   test('reading date falls back to due date minus 25 days', () {
     final f = forecaster.forecast(
       bill(units: 106, present: 355, dueDate: '2026-10-14'),
