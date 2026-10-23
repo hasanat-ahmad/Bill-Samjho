@@ -62,17 +62,16 @@ class _ConfirmViewState extends State<ConfirmView> {
           children: [
             Text(s.t('confirm_hint'), style: theme.textTheme.bodyMedium),
             if (data.confidence < AppConstants.lowConfidence) ...[
-              const SizedBox(height: Gap.lg),
-              AppCard(
-                color: AppColors.amberSoft,
-                borderColor: AppColors.amberSoft,
-                padding: const EdgeInsets.all(Gap.lg),
-                child: Row(children: [
-                  const Icon(Icons.error_rounded, color: AppColors.amberInk, size: 28),
-                  const SizedBox(width: Gap.md),
+              const SizedBox(height: Gap.md),
+              Container(
+                padding: const EdgeInsets.all(Gap.md),
+                decoration: BoxDecoration(color: AppColors.amberSoft, borderRadius: BorderRadius.circular(Radii.sm)),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.error_outline_rounded, color: AppColors.amber, size: 20),
+                  const SizedBox(width: Gap.sm),
                   Expanded(
                     child: Text(s.t('confirm_low_confidence'),
-                        style: theme.textTheme.bodyLarge?.copyWith(color: AppColors.amberInk)),
+                        style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.amberInk)),
                   ),
                 ]),
               ),
@@ -82,12 +81,11 @@ class _ConfirmViewState extends State<ConfirmView> {
               _PhotoPreview(widget.jpeg!),
             ],
             const SizedBox(height: Gap.lg),
-            _InfoTile(icon: Icons.calendar_month_rounded, label: s.t('month'), value: formatMonth(data.billMonth, s)),
-            const SizedBox(height: Gap.md),
+            _InfoTile(label: s.t('month'), value: formatMonth(data.billMonth, s)),
+            const SizedBox(height: Gap.lg),
             _NumberField(
               controller: _units,
               label: s.t('units_label'),
-              icon: Icons.bolt_rounded,
               allowDecimal: false,
               validator: (v) {
                 final n = int.tryParse(v ?? '');
@@ -98,7 +96,6 @@ class _ConfirmViewState extends State<ConfirmView> {
             _NumberField(
               controller: _total,
               label: s.t('total_label'),
-              icon: Icons.payments_rounded,
               allowDecimal: true,
               validator: (v) {
                 final n = double.tryParse(v ?? '');
@@ -108,26 +105,31 @@ class _ConfirmViewState extends State<ConfirmView> {
             if (data.isCredit) ...[
               const SizedBox(height: Gap.sm),
               Row(children: [
-                const Icon(Icons.savings_rounded, color: AppColors.green, size: 22),
+                const Icon(Icons.savings_outlined, color: AppColors.green, size: 20),
                 const SizedBox(width: Gap.sm),
                 Expanded(child: Text(s.t('credit_bill'), style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.greenInk))),
               ]),
             ],
             if (data.dueDate != null) ...[
-              const SizedBox(height: Gap.md),
-              _InfoTile(icon: Icons.event_rounded, label: s.t('due_date'), value: formatDate(data.dueDate!, s)),
+              const SizedBox(height: Gap.lg),
+              _InfoTile(label: s.t('due_date'), value: formatDate(data.dueDate!, s)),
             ],
           ],
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(Gap.page, Gap.sm, Gap.page, Gap.lg),
-          child: PrimaryButton(
-            label: s.t('looks_right'),
-            icon: Icons.check_rounded,
-            busy: widget.saving,
-            onPressed: _submit,
+      bottomNavigationBar: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Gap.page, Gap.md, Gap.page, Gap.md),
+            child: PrimaryButton(
+              label: s.t('looks_right'),
+              busy: widget.saving,
+              onPressed: _submit,
+            ),
           ),
         ),
       ),
@@ -175,8 +177,8 @@ class _PhotoPreview extends StatelessWidget {
         onTap: () => _zoom(context),
         child: Container(
           decoration: BoxDecoration(
-            color: AppColors.surfaceAlt,
-            borderRadius: BorderRadius.circular(Radii.lg),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(Radii.md),
             border: Border.all(color: AppColors.border),
           ),
           clipBehavior: Clip.antiAlias,
@@ -187,9 +189,9 @@ class _PhotoPreview extends StatelessWidget {
               end: Gap.sm,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.xs + 2),
-                decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.65), borderRadius: BorderRadius.circular(999)),
+                decoration: BoxDecoration(color: AppColors.ink.withValues(alpha: 0.75), borderRadius: BorderRadius.circular(999)),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.zoom_in_rounded, color: Colors.white, size: 20),
+                  const Icon(Icons.zoom_in_rounded, color: Colors.white, size: 18),
                   const SizedBox(width: Gap.xs),
                   Text(s.t('tap_to_zoom'), style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white)),
                 ]),
@@ -202,10 +204,10 @@ class _PhotoPreview extends StatelessWidget {
   }
 }
 
+/// A value read from the bill that is not edited here.
 class _InfoTile extends StatelessWidget {
-  const _InfoTile({required this.icon, required this.label, required this.value});
+  const _InfoTile({required this.label, required this.value});
 
-  final IconData icon;
   final String label;
   final String value;
 
@@ -213,16 +215,10 @@ class _InfoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AppCard(
-      padding: const EdgeInsets.all(Gap.lg),
+      padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: Gap.md + 2),
       child: Row(children: [
-        IconBadge(icon, color: AppColors.primary, background: AppColors.primarySoft, size: 36),
-        const SizedBox(width: Gap.md),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: theme.textTheme.bodySmall),
-            Text(value, style: theme.textTheme.titleMedium),
-          ]),
-        ),
+        Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
+        Text(value, style: theme.textTheme.titleSmall),
       ]),
     );
   }
@@ -232,14 +228,12 @@ class _NumberField extends StatelessWidget {
   const _NumberField({
     required this.controller,
     required this.label,
-    required this.icon,
     required this.allowDecimal,
     required this.validator,
   });
 
   final TextEditingController controller;
   final String label;
-  final IconData icon;
   final bool allowDecimal;
   final FormFieldValidator<String> validator;
 
@@ -248,49 +242,20 @@ class _NumberField extends StatelessWidget {
     final theme = Theme.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
-        padding: const EdgeInsetsDirectional.only(start: Gap.xs, bottom: Gap.xs),
+        padding: const EdgeInsetsDirectional.only(start: Gap.xs, bottom: Gap.sm),
         child: Text(label, style: theme.textTheme.titleSmall),
       ),
       TextFormField(
         controller: controller,
         validator: validator,
         keyboardType: TextInputType.numberWithOptions(decimal: allowDecimal),
-        inputFormatters: [_WesternDigitsFormatter(allowDecimal: allowDecimal), LengthLimitingTextInputFormatter(10)],
+        inputFormatters: [WesternDigitsFormatter(allowDecimal: allowDecimal), LengthLimitingTextInputFormatter(10)],
         textDirection: TextDirection.ltr,
         style: numberStyle(22),
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon, color: AppColors.primary, size: 22),
-          suffixIcon: const Icon(Icons.edit_rounded, color: AppColors.inkMuted),
+        decoration: const InputDecoration(
+          suffixIcon: Icon(Icons.edit_outlined, color: AppColors.inkSubtle, size: 20),
         ),
       ),
     ]);
-  }
-}
-
-/// Converts Urdu (۰-۹) and Arabic (٠-٩) digits to 0-9 and drops anything else,
-/// so users with an Urdu keyboard can still correct numbers.
-class _WesternDigitsFormatter extends TextInputFormatter {
-  _WesternDigitsFormatter({required this.allowDecimal});
-
-  final bool allowDecimal;
-
-  @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
-    final buffer = StringBuffer();
-    var hasDot = false;
-    for (final r in newValue.text.runes) {
-      if (r >= 0x30 && r <= 0x39) {
-        buffer.writeCharCode(r);
-      } else if (r >= 0x6F0 && r <= 0x6F9) {
-        buffer.writeCharCode(r - 0x6F0 + 0x30);
-      } else if (r >= 0x660 && r <= 0x669) {
-        buffer.writeCharCode(r - 0x660 + 0x30);
-      } else if (allowDecimal && !hasDot && (r == 0x2E || r == 0x66B)) {
-        buffer.write('.');
-        hasDot = true;
-      }
-    }
-    final text = buffer.toString();
-    return TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
   }
 }

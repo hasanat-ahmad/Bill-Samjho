@@ -57,15 +57,15 @@ class _ReadingView extends StatelessWidget {
               const SizedBox(height: Gap.xxl),
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
-                child: Text(title, key: ValueKey(title), style: theme.textTheme.headlineSmall, textAlign: TextAlign.center),
+                child: Text(title, key: ValueKey(title), style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
               ),
               const SizedBox(height: Gap.sm),
               Text(s.t('reading_hint'), style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
               const SizedBox(height: Gap.xl),
               ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  minHeight: 8,
+                  minHeight: 4,
                   value: state.phase == ReadPhase.uploading ? state.progress : null,
                 ),
               ),
@@ -102,53 +102,38 @@ class _ScanAnimationState extends State<_ScanAnimation> with SingleTickerProvide
 
   @override
   Widget build(BuildContext context) {
-    const width = 120.0, height = 150.0;
-    return Container(
-      width: 180,
-      height: 180,
-      decoration: const BoxDecoration(color: AppColors.primarySoft, shape: BoxShape.circle),
-      alignment: Alignment.center,
-      child: SizedBox(
-        width: width,
-        height: height,
-        child: Stack(children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(Radii.md),
-              boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.15), blurRadius: 20, offset: const Offset(0, 8))],
-            ),
-            padding: const EdgeInsets.all(Gap.md),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Icon(Icons.bolt_rounded, color: AppColors.amber, size: 20),
-              const SizedBox(height: Gap.sm),
-              for (final w in [80.0, 64.0, 90.0, 50.0, 72.0])
-                Container(
-                  margin: const EdgeInsets.only(bottom: 9),
-                  width: w,
-                  height: 8,
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(4)),
-                ),
-            ]),
+    const width = 104.0, height = 132.0;
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(children: [
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(Radii.sm),
+            border: Border.all(color: AppColors.borderStrong),
           ),
-          AnimatedBuilder(
-            animation: _c,
-            builder: (context, _) => Positioned(
-              top: 8 + (height - 24) * Curves.easeInOut.transform(_c.value),
-              left: 8,
-              right: 8,
-              child: Container(
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(2),
-                  boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.5), blurRadius: 12)],
-                ),
+          padding: const EdgeInsets.all(Gap.md),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            for (final w in [44.0, 72.0, 60.0, 78.0, 40.0, 66.0])
+              Container(
+                margin: const EdgeInsets.only(bottom: 9),
+                width: w,
+                height: 6,
+                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(3)),
               ),
-            ),
+          ]),
+        ),
+        AnimatedBuilder(
+          animation: _c,
+          builder: (context, _) => Positioned(
+            top: 6 + (height - 14) * Curves.easeInOut.transform(_c.value),
+            left: 0,
+            right: 0,
+            child: Container(height: 2, color: AppColors.primary),
           ),
-        ]),
-      ),
+        ),
+      ]),
     );
   }
 }
@@ -163,13 +148,13 @@ class _CancelledView extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(),
       body: MessageView(
-        icon: Icons.document_scanner_rounded,
+        icon: Icons.document_scanner_outlined,
         title: s.t('take_photo'),
         body: s.t('take_photo_body'),
         actions: [
           PrimaryButton(
             label: s.t('open_camera'),
-            icon: Icons.photo_camera_rounded,
+            icon: Icons.photo_camera_outlined,
             onPressed: () => cubit.start(source: PhotoSource.camera),
           ),
           SecondaryButton(
