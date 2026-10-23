@@ -65,24 +65,25 @@ class _PickConnectionSheetState extends State<_PickConnectionSheet> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (connections.isNotEmpty) ...[
             Text(s.t('pick_title'), style: theme.textTheme.titleLarge),
-            const SizedBox(height: Gap.lg),
-            for (final c in connections)
-              Padding(
-                padding: const EdgeInsets.only(bottom: Gap.sm),
-                child: AppCard(
-                  padding: const EdgeInsets.all(Gap.md),
-                  onTap: () => Navigator.pop(context, c.id),
-                  child: Row(children: [
-                    const IconBadge(Icons.home_rounded, color: AppColors.primary, background: AppColors.primarySoft),
-                    const SizedBox(width: Gap.md),
-                    Expanded(child: Text(c.nickname, style: theme.textTheme.titleMedium)),
-                    Icon(widget.actionIcon, color: AppColors.primary),
-                  ]),
-                ),
-              ),
             const SizedBox(height: Gap.md),
+            AppCard(
+              padding: EdgeInsets.zero,
+              borderColor: AppColors.border,
+              child: Column(children: [
+                for (final (i, c) in connections.indexed) ...[
+                  if (i > 0) const PanelDivider(indent: 54),
+                  PanelTile(
+                    icon: Icons.home_outlined,
+                    title: c.nickname,
+                    trailing: Icon(widget.actionIcon, color: AppColors.primary, size: 22),
+                    onTap: () => Navigator.pop(context, c.id),
+                  ),
+                ],
+              ]),
+            ),
+            const SizedBox(height: Gap.xl),
           ],
-          Text(s.t('add_meter'), style: theme.textTheme.titleLarge),
+          Text(s.t('add_meter'), style: theme.textTheme.titleMedium),
           const SizedBox(height: Gap.md),
           Wrap(
             spacing: Gap.sm,
@@ -90,7 +91,7 @@ class _PickConnectionSheetState extends State<_PickConnectionSheet> {
             children: [
               for (final p in presets)
                 ActionChip(
-                  avatar: const Icon(Icons.add_rounded, color: AppColors.primary),
+                  avatar: const Icon(Icons.add_rounded, color: AppColors.primary, size: 18),
                   label: Text(p),
                   onPressed: () => _create(p),
                 ),
@@ -111,7 +112,7 @@ class _PickConnectionSheetState extends State<_PickConnectionSheet> {
             ),
             const SizedBox(width: Gap.sm),
             FilledButton(
-              style: FilledButton.styleFrom(minimumSize: const Size(64, 58)),
+              style: FilledButton.styleFrom(minimumSize: const Size(72, 52)),
               onPressed: () => _create(_name.text),
               child: Text(s.t('add')),
             ),
