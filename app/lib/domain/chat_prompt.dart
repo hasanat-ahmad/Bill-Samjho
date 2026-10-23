@@ -64,6 +64,7 @@ ${ExplanationBuilder.ordered(bill.findings).map((f) => '- ${explain.findingText(
 
 NEXT BILL ESTIMATE (rough, by the app):
 ${forecast == null ? '- Not available.' : '- ${explain.forecastText(forecast)}'}
+- For a closer estimate, the user can tap "${s.t('forecast_cta')}" on the bill screen and type today's meter reading.
 ${forecast == null || forecast.amountsByUnits.isEmpty ? '' : '''
 ROUGH BILL FOR OTHER UNITS (by the app, same taxes and charges as this bill; above ${config.protectedLimitUnits} units the higher non-protected rate applies). For a number between two rows, say "about" and give the nearest row or a range; never calculate exact amounts yourself:
 ${forecast.amountsByUnits.entries.map((e) => '- ${e.key} units: about ${rs(e.value.round())}').join('\n')}
