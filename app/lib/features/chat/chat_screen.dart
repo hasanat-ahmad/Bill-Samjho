@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -6,6 +9,7 @@ import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/bill_chat.dart';
 import '../../domain/format.dart';
+import '../../services/dictation_service.dart';
 import '../../services/tts_service.dart';
 import 'chat_cubit.dart';
 
@@ -24,16 +28,37 @@ class _ChatScreenState extends State<ChatScreen> {
   final _input = TextEditingController();
   final _scroll = ScrollController();
   late final TtsService _tts;
+  late final Dictation? _dictation;
+  bool _listening = false;
+
+  /// Microphone loudness 0..1 while listening, for the pulsing ring.
+  final _level = ValueNotifier<double>(0);
+
+  /// Text already typed when voice typing started; speech is added after it.
+  String _typed = '';
+
+  static final _pill = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(24),
+    borderSide: BorderSide.none,
+  );
+
+  /// Counts listening sessions. The recognizer can deliver a late final
+  /// result after the session ended (or after the question was sent); those
+  /// carry an old number and are ignored, so the box stays clear.
+  int _session = 0;
 
   @override
   void initState() {
     super.initState();
     _tts = context.read<TtsService>();
+    _dictation = context.read<Dictation?>();
   }
 
   @override
   void dispose() {
     _tts.stop();
+    if (_listening) _dictation?.cancel();
+    _level.dispose();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -42,9 +67,52 @@ class _ChatScreenState extends State<ChatScreen> {
   void _send([String? text]) {
     final q = (text ?? _input.text).trim();
     if (q.isEmpty) return;
+    if (_listening) _dictation?.cancel();
+    _session++;
+    _endListening();
     _input.clear();
     FocusScope.of(context).unfocus();
     context.read<ChatCubit>().ask(q);
+  }
+
+  Future<void> _toggleMic() async {
+    final dictation = _dictation;
+    if (dictation == null) return;
+    if (_listening) return dictation.stop();
+    // Don't let the phone hear its own voice.
+    unawaited(_tts.stop());
+    FocusScope.of(context).unfocus();
+    _typed = _input.text.trim();
+    _level.value = 0;
+    final session = ++_session;
+    bool current() => mounted && session == _session && _listening;
+    setState(() => _listening = true);
+    await dictation.start(
+      language: context.read<AppStrings>().language,
+      onText: (text, done) {
+        if (!current()) return;
+        var all = [_typed, text.trim()].where((x) => x.isNotEmpty).join(' ');
+        if (all.length > BillChat.maxQuestionLength) all = all.substring(0, BillChat.maxQuestionLength);
+        _input.value = TextEditingValue(text: all, selection: TextSelection.collapsed(offset: all.length));
+        if (done) _endListening();
+      },
+      onError: (error) {
+        if (!current()) return;
+        _endListening();
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(context.read<AppStrings>().t('dictate_${error.name}'))));
+      },
+      onEnd: () {
+        if (current()) _endListening();
+      },
+      // Android reports roughly -2..10 dB.
+      onLevel: (db) => _level.value = ((db + 2) / 12).clamp(0.0, 1.0),
+    );
+  }
+
+  void _endListening() {
+    if (mounted && _listening) setState(() => _listening = false);
   }
 
   void _scrollToEnd() => WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -81,8 +149,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
                       for (final q in suggestions)
                         ActionChip(
-                          avatar: const Icon(Icons.help_outline_rounded, size: 18, color: AppColors.primary),
-                          label: Text(q, style: theme.textTheme.labelMedium),
+                          shape: const StadiumBorder(),
+                          padding: const EdgeInsets.symmetric(horizontal: Gap.xs, vertical: Gap.xs),
+                          label: Text(q, style: theme.textTheme.labelMedium?.copyWith(color: AppColors.primaryDark)),
                           onPressed: state.busy ? null : () => _send(q),
                         ),
                     ]),
@@ -121,7 +190,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   ],
                   const SizedBox(height: Gap.lg),
                   Text(
-                    '${s.t('chat_disclaimer')} ${s.t('chat_privacy')}',
+                    [
+                      s.t('chat_disclaimer'),
+                      s.t('chat_privacy'),
+                      if (_dictation != null) s.t('chat_voice_privacy'),
+                    ].join(' '),
                     style: theme.textTheme.bodySmall,
                     textAlign: TextAlign.center,
                   ),
@@ -141,20 +214,45 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: TextField(
                       controller: _input,
                       enabled: !state.unavailable && !state.atLimit,
+                      readOnly: _listening,
                       minLines: 1,
                       maxLines: 4,
                       maxLength: BillChat.maxQuestionLength,
                       textInputAction: TextInputAction.send,
                       style: theme.textTheme.bodyLarge,
-                      decoration: InputDecoration(hintText: s.t('chat_hint'), counterText: ''),
+                      decoration: InputDecoration(
+                        hintText: s.t(_listening ? 'dictate_listening' : 'chat_hint'),
+                        counterText: '',
+                        fillColor: AppColors.canvas,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: Gap.md),
+                        border: _pill,
+                        enabledBorder: _pill,
+                        disabledBorder: _pill,
+                        focusedBorder: _pill.copyWith(borderSide: const BorderSide(color: AppColors.primary)),
+                      ),
                       onSubmitted: (_) => _send(),
                     ),
                   ),
                   const SizedBox(width: Gap.xs),
-                  IconButton.filled(
-                    tooltip: s.t('chat_send'),
-                    onPressed: state.busy || state.unavailable || state.atLimit ? null : _send,
-                    icon: const Icon(Icons.send_rounded),
+                  // WhatsApp-style: the mic until there is text to send.
+                  ValueListenableBuilder(
+                    valueListenable: _input,
+                    builder: (context, value, _) {
+                      final off = state.unavailable || state.atLimit;
+                      if (_dictation != null && (_listening || value.text.trim().isEmpty)) {
+                        return _MicButton(
+                          listening: _listening,
+                          level: _level,
+                          tooltip: s.t(_listening ? 'dictate_stop' : 'dictate'),
+                          onPressed: off ? null : _toggleMic,
+                        );
+                      }
+                      return IconButton.filled(
+                        tooltip: s.t('chat_send'),
+                        onPressed: state.busy || off ? null : _send,
+                        icon: const Icon(Icons.send_rounded),
+                      );
+                    },
                   ),
                 ]),
               ),
@@ -180,7 +278,8 @@ class _Bubble extends StatelessWidget {
       constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
       padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.sm + 2),
       decoration: BoxDecoration(
-        color: fromUser ? AppColors.primary : AppColors.surfaceAlt,
+        color: fromUser ? AppColors.primary : AppColors.surface,
+        border: fromUser ? null : Border.all(color: AppColors.border),
         borderRadius: BorderRadiusDirectional.only(
           topStart: const Radius.circular(Radii.md),
           topEnd: const Radius.circular(Radii.md),
@@ -204,6 +303,40 @@ class _Bubble extends StatelessWidget {
   }
 }
 
+/// Mic for voice typing; while listening it turns into a red stop button
+/// with a ring that grows with the speaker's voice.
+class _MicButton extends StatelessWidget {
+  const _MicButton({required this.listening, required this.level, required this.tooltip, required this.onPressed});
+
+  final bool listening;
+  final ValueListenable<double> level;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!listening) {
+      return IconButton.filledTonal(tooltip: tooltip, onPressed: onPressed, icon: const Icon(Icons.mic_rounded));
+    }
+    return ValueListenableBuilder(
+      valueListenable: level,
+      builder: (context, v, child) => DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: AppColors.red.withValues(alpha: 0.25), spreadRadius: 2 + 8 * v)],
+        ),
+        child: child,
+      ),
+      child: IconButton.filled(
+        tooltip: tooltip,
+        style: IconButton.styleFrom(backgroundColor: AppColors.red),
+        onPressed: onPressed,
+        icon: const Icon(Icons.stop_rounded),
+      ),
+    );
+  }
+}
+
 class _Typing extends StatelessWidget {
   const _Typing();
 
@@ -212,7 +345,11 @@ class _Typing extends StatelessWidget {
         alignment: AlignmentDirectional.centerStart,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.md),
-          decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(Radii.md)),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(Radii.md),
+          ),
           child: const SizedBox(width: 36, height: 12, child: LinearProgressIndicator(minHeight: 4)),
         ),
       );
