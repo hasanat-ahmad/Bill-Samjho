@@ -13,6 +13,7 @@ import 'data/bill_repository.dart';
 import 'data/local_store.dart';
 import 'features/home/home_cubit.dart';
 import 'features/settings/settings_cubit.dart';
+import 'services/dictation_service.dart';
 import 'services/scan_service.dart';
 import 'services/tts_service.dart';
 
@@ -25,6 +26,7 @@ class BillSamjhoApp extends StatefulWidget {
     required this.tts,
     required this.scanner,
     this.chat = const ChatAvailability(null),
+    this.dictation,
     this.appVersion = '',
   });
 
@@ -34,6 +36,9 @@ class BillSamjhoApp extends StatefulWidget {
   final TtsService tts;
   final ScanService scanner;
   final ChatAvailability chat;
+
+  /// Voice typing in the chat; null hides the mic.
+  final Dictation? dictation;
   final String appVersion;
 
   @override
@@ -82,6 +87,7 @@ class _BillSamjhoAppState extends State<BillSamjhoApp> {
         RepositoryProvider.value(value: widget.tts),
         RepositoryProvider.value(value: widget.scanner),
         RepositoryProvider.value(value: widget.chat),
+        RepositoryProvider<Dictation?>.value(value: widget.dictation),
         RepositoryProvider<AppVersion>.value(value: AppVersion(widget.appVersion)),
       ],
       child: MultiBlocProvider(

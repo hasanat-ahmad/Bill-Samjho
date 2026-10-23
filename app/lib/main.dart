@@ -21,6 +21,7 @@ import 'data/bill_chat.dart';
 import 'data/bill_repository.dart';
 import 'data/local_store.dart';
 import 'data/tariff_config_service.dart';
+import 'services/dictation_service.dart';
 import 'services/scan_service.dart';
 import 'services/tts_service.dart';
 
@@ -82,6 +83,7 @@ Future<void> main() async {
     tts: tts,
     scanner: ScanService(),
     chat: ChatAvailability((prompt) => FirebaseBillChat(prompt, firebase), firebase: firebase),
+    dictation: SpeechDictation(),
     appVersion: version,
   ));
 }
