@@ -12,8 +12,9 @@ Bill Samjho handles electricity bills, which show a household's name, address an
 | Bill numbers, photo copy | On the phone only, encrypted | Until the user deletes them |
 | Random device ID (UUID) | Phone, and as a rate-limit counter key on the server | Server counters expire after 2 days |
 | IP address | Only as an HMAC (keyed hash) in a rate-limit counter | Expires after 2 days |
+| Spoken question (optional) | The phone's speech recognizer (usually Google) turns it into text; the app never records or stores audio | Not kept by the app |
 
-No account, phone number, CNIC or location is collected. The app requests no storage, camera or location permission: the camera and photo picker are system screens that return only the chosen photo.
+No account, phone number, CNIC or location is collected. The app requests no storage, camera or location permission: the camera and photo picker are system screens that return only the chosen photo. The only runtime permission is the microphone, asked the first time someone taps the mic in the chat (no Bluetooth permission); declining it only turns off voice typing.
 
 ## App (Android)
 

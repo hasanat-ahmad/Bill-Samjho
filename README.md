@@ -18,7 +18,7 @@ Two ways to get a bill:
 After a bill is read, the result screen also offers:
 
 - **Next bill estimate** (no AI, works offline): units from the same month last year adjusted by the recent trend, else recent months, else this bill; or, with *Check with today's meter reading*, a projection from actual daily use since the bill's reading date. The amount scales the official energy cost by the bill's own total-to-energy ratio. Warns before the 200-unit limit with a daily-units budget. `lib/domain/forecaster.dart`.
-- **Ask about this bill**: a chat helper (Gemini through Firebase AI Logic) grounded in the bill's validated numbers, the app's findings, the estimate, tariff facts and the glossary (`lib/domain/chat_prompt.dart`). Answers in the app language, short and simple, with voice; stays on electricity topics, never invents numbers, never says a bill is definitely wrong. Nothing is stored; max 20 questions per chat.
+- **Ask about this bill**: a chat helper (Gemini through Firebase AI Logic) grounded in the bill's validated numbers, the app's findings, the estimate, tariff facts and the glossary (`lib/domain/chat_prompt.dart`). Answers in the app language, short and simple, with voice; stays on electricity topics, never invents numbers, never says a bill is definitely wrong. Nothing is stored; max 20 questions per chat. Questions can be spoken: the mic turns speech (Urdu or English, following the app language) into text the user checks before sending (`lib/services/dictation_service.dart`).
 
 **Key principle:** AI only reads the image. The rules engine on the phone makes every judgement and fills every number into fixed templates.
 
