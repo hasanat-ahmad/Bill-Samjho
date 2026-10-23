@@ -13,45 +13,57 @@ import 'theme.dart';
 /// since Android draws apps edge to edge.
 double bottomPadding(BuildContext context, [double base = Gap.xxl]) => base + MediaQuery.paddingOf(context).bottom;
 
-/// App mark: a bill with a lightning bolt.
+/// App mark: the launcher icon (a bill with a lightning bolt).
 class AppLogo extends StatelessWidget {
   const AppLogo({super.key, this.size = 40});
 
   final double size;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.primary, AppColors.primaryDark],
-        ),
-        borderRadius: BorderRadius.circular(size * 0.28),
-      ),
-      child: Stack(alignment: Alignment.center, children: [
-        Icon(Icons.receipt_long_rounded, color: Colors.white, size: size * 0.56),
-        PositionedDirectional(
-          end: size * 0.12,
-          bottom: size * 0.1,
-          child: Icon(Icons.bolt_rounded, color: AppColors.amber, size: size * 0.36),
-        ),
-      ]),
-    );
-  }
+  Widget build(BuildContext context) => SizedBox.square(dimension: size, child: const CustomPaint(painter: _LogoPainter()));
 }
 
-/// White rounded card with a hairline border; optionally tappable.
+class _LogoPainter extends CustomPainter {
+  const _LogoPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(s * 0.26)),
+      Paint()..color = AppColors.primary,
+    );
+    // Same shapes as res/drawable/ic_launcher_foreground.xml (108-unit box,
+    // content inside 28..80), with a margin around them.
+    canvas.save();
+    canvas.scale(s / 72);
+    canvas.translate(-19, -18);
+    Path poly(List<double> p) {
+      final path = Path()..moveTo(p[0], p[1]);
+      for (var i = 2; i < p.length; i += 2) {
+        path.lineTo(p[i], p[i + 1]);
+      }
+      return path..close();
+    }
+
+    canvas.drawPath(poly([36, 28, 64, 28, 74, 38, 74, 80, 36, 80]), Paint()..color = Colors.white);
+    canvas.drawPath(poly([64, 28, 64, 38, 74, 38]), Paint()..color = const Color(0xFFBBDEFB));
+    canvas.drawPath(poly([58, 36, 44, 57, 53, 57, 49, 72, 64, 50, 55, 50]), Paint()..color = const Color(0xFFF9A825));
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_LogoPainter oldDelegate) => false;
+}
+
+/// White section on the grey page; optionally tappable.
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(Gap.page),
+    this.padding = const EdgeInsets.all(Gap.lg),
     this.color = AppColors.surface,
-    this.borderColor = AppColors.border,
+    this.borderColor,
     this.onTap,
     this.onLongPress,
   });
@@ -59,19 +71,18 @@ class AppCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final Color color;
-  final Color borderColor;
+  final Color? borderColor;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(Radii.lg),
-      side: BorderSide(color: borderColor),
-    );
     return Material(
       color: color,
-      shape: shape,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(Radii.md),
+        side: borderColor == null ? BorderSide.none : BorderSide(color: borderColor!),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -82,6 +93,7 @@ class AppCard extends StatelessWidget {
   }
 }
 
+/// Small muted heading above a section.
 class SectionTitle extends StatelessWidget {
   const SectionTitle(this.text, {super.key, this.trailing});
 
@@ -91,33 +103,100 @@ class SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: Gap.lg + Gap.xs, bottom: Gap.sm + 2),
+      padding: const EdgeInsetsDirectional.fromSTEB(Gap.xs, Gap.xl, 0, Gap.sm),
       child: Row(children: [
-        Expanded(child: Text(text, style: Theme.of(context).textTheme.titleLarge)),
+        Expanded(child: Text(text, style: Theme.of(context).textTheme.labelSmall)),
         ?trailing,
       ]),
     );
   }
 }
 
-/// Rounded square with a tinted background and an icon.
-class IconBadge extends StatelessWidget {
-  const IconBadge(this.icon, {super.key, required this.color, required this.background, this.size = 40});
+/// Hairline between rows inside a section, inset from the start edge.
+class PanelDivider extends StatelessWidget {
+  const PanelDivider({super.key, this.indent = Gap.lg});
 
-  final IconData icon;
-  final Color color;
-  final Color background;
-  final double size;
+  final double indent;
+
+  @override
+  Widget build(BuildContext context) => Divider(indent: indent, endIndent: 0);
+}
+
+/// A row in a section: optional icon, title, subtitle and trailing widget.
+class PanelTile extends StatelessWidget {
+  const PanelTile({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.icon,
+    this.iconColor = AppColors.inkMuted,
+    this.titleColor,
+    this.trailing,
+    this.onTap,
+    this.onLongPress,
+    this.chevron = true,
+  });
+
+  final String title;
+  final String? subtitle;
+  final IconData? icon;
+  final Color iconColor;
+  final Color? titleColor;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  /// Shows a chevron when tappable and there is no [trailing].
+  final bool chevron;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(size * 0.3)),
-      child: Icon(icon, color: color, size: size * 0.55),
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 56),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.md, Gap.md, Gap.md),
+          child: Row(children: [
+            if (icon != null) ...[
+              Icon(icon, color: iconColor, size: 22),
+              const SizedBox(width: Gap.lg),
+            ],
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                Text(title, style: theme.textTheme.titleSmall?.copyWith(color: titleColor)),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(subtitle!, style: theme.textTheme.bodySmall),
+                ],
+              ]),
+            ),
+            if (trailing != null) ...[const SizedBox(width: Gap.sm), trailing!],
+            if (trailing == null && chevron && onTap != null)
+              const Icon(Icons.chevron_right_rounded, color: AppColors.inkSubtle),
+          ]),
+        ),
+      ),
     );
   }
+}
+
+/// Muted icon + small text, for notes under forms and sections.
+class NoteRow extends StatelessWidget {
+  const NoteRow({super.key, required this.icon, required this.text, this.color = AppColors.inkSubtle});
+
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(padding: const EdgeInsets.only(top: 1), child: Icon(icon, color: color, size: 17)),
+        const SizedBox(width: Gap.sm),
+        Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
+      ]);
 }
 
 /// Verdict as colour + icon + word (NFR-03).
@@ -134,12 +213,12 @@ class VerdictPill extends StatelessWidget {
       label: label,
       excludeSemantics: true,
       child: Container(
-        padding: const EdgeInsetsDirectional.fromSTEB(Gap.sm, Gap.xs, Gap.md, Gap.xs),
+        padding: const EdgeInsetsDirectional.fromSTEB(Gap.sm, 3, Gap.sm + 2, 3),
         decoration: BoxDecoration(color: tone.soft, borderRadius: BorderRadius.circular(999)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(tone.icon, color: tone.color, size: 18),
-          const SizedBox(width: Gap.xs),
-          Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: tone.ink)),
+          Icon(tone.icon, color: tone.color, size: 15),
+          const SizedBox(width: 5),
+          Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: tone.ink, fontSize: 12.5)),
         ]),
       ),
     );
@@ -160,13 +239,13 @@ class PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final style = FilledButton.styleFrom(
       backgroundColor: color,
-      minimumSize: const Size.fromHeight(52),
+      minimumSize: const Size.fromHeight(50),
     );
     final iconWidget = busy
-        ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+        ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white))
         : icon == null
             ? null
-            : Icon(icon, size: 22);
+            : Icon(icon, size: 20);
     final onTap = busy || onPressed == null
         ? null
         : () {
@@ -196,13 +275,12 @@ class SecondaryButton extends StatelessWidget {
   }
 }
 
-/// Round play/stop button for one piece of text (FR-10).
+/// Quiet play/stop icon for one piece of text (FR-10).
 class PlayButton extends StatelessWidget {
-  const PlayButton({super.key, required this.id, required this.text, this.tone = Tone.info});
+  const PlayButton({super.key, required this.id, required this.text});
 
   final String id;
   final String text;
-  final Tone tone;
 
   @override
   Widget build(BuildContext context) {
@@ -212,105 +290,15 @@ class PlayButton extends StatelessWidget {
       valueListenable: tts.playing,
       builder: (context, playing, _) {
         final isPlaying = playing == id;
-        return IconButton.filledTonal(
+        return IconButton(
           tooltip: isPlaying ? s.t('stop') : s.t('listen'),
-          style: IconButton.styleFrom(backgroundColor: tone.soft, foregroundColor: tone.ink),
-          iconSize: 22,
-          icon: Icon(isPlaying ? Icons.stop_rounded : Icons.volume_up_rounded),
+          iconSize: 20,
+          color: isPlaying ? AppColors.primary : AppColors.inkSubtle,
+          icon: Icon(isPlaying ? Icons.stop_circle_outlined : Icons.volume_up_outlined),
           onPressed: () => tts.toggle(id, text),
         );
       },
     );
-  }
-}
-
-/// Large "listen" action with an animated sound wave while speaking.
-class ListenButton extends StatelessWidget {
-  const ListenButton({super.key, required this.id, required this.text, required this.label});
-
-  final String id;
-  final String text;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final tts = context.read<TtsService>();
-    final s = context.s;
-    final theme = Theme.of(context);
-    return ValueListenableBuilder<String?>(
-      valueListenable: tts.playing,
-      builder: (context, playing, _) {
-        final isPlaying = playing == id;
-        return Semantics(
-          button: true,
-          label: isPlaying ? s.t('stop') : label,
-          excludeSemantics: true,
-          child: AppCard(
-            color: AppColors.primarySoft,
-            borderColor: AppColors.primarySoft,
-            padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.sm),
-            onTap: () {
-              HapticFeedback.selectionClick();
-              tts.toggle(id, text);
-            },
-            child: Row(children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                child: Icon(isPlaying ? Icons.stop_rounded : Icons.volume_up_rounded, color: Colors.white, size: 24),
-              ),
-              const SizedBox(width: Gap.lg),
-              Expanded(
-                child: Text(
-                  isPlaying ? s.t('stop') : label,
-                  style: theme.textTheme.titleMedium?.copyWith(color: AppColors.primaryDark),
-                ),
-              ),
-              if (isPlaying) const _SoundWave(),
-            ]),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _SoundWave extends StatefulWidget {
-  const _SoundWave();
-
-  @override
-  State<_SoundWave> createState() => _SoundWaveState();
-}
-
-class _SoundWaveState extends State<_SoundWave> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) => Row(mainAxisSize: MainAxisSize.min, children: [
-        for (var i = 0; i < 4; i++)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 2),
-            width: 4,
-            height: 8 + 16 * (0.5 + 0.5 * _wave(_c.value + i * 0.22)),
-            decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(2)),
-          ),
-      ]),
-    );
-  }
-
-  static double _wave(double t) {
-    final x = (t % 1) * 2 - 1; // -1..1
-    return 1 - 2 * x.abs(); // triangle wave -1..1
   }
 }
 
@@ -321,7 +309,7 @@ class UnitMeter extends StatelessWidget {
     required this.units,
     required this.limit,
     required this.nearLimit,
-    this.height = 12,
+    this.height = 6,
     this.showScale = false,
   });
 
@@ -345,29 +333,30 @@ class UnitMeter extends StatelessWidget {
       child: SizedBox(
         height: height,
         child: Stack(children: [
-          Container(color: AppColors.surfaceAlt),
+          // Containers without a child fill the space they are given.
+          Container(color: const Color(0xFFE6E9ED)),
           FractionallySizedBox(
             alignment: AlignmentDirectional.centerStart,
             widthFactor: fraction,
             child: Container(color: tone.color),
           ),
-          // Marker where "near the limit" starts.
+          // Tick where "near the limit" starts.
           FractionallySizedBox(
             alignment: AlignmentDirectional.centerStart,
             widthFactor: (nearLimit / limit).clamp(0.0, 1.0),
-            child: const Align(
+            child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: SizedBox(width: 2, child: ColoredBox(color: Colors.white)),
+              child: Container(width: 2, color: Colors.white),
             ),
           ),
         ]),
       ),
     );
     if (!showScale) return bar;
-    final scaleStyle = numberStyle(13, color: AppColors.inkMuted, weight: FontWeight.w500);
+    final scaleStyle = numberStyle(12, color: AppColors.inkSubtle, weight: FontWeight.w500);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       bar,
-      const SizedBox(height: Gap.xs),
+      const SizedBox(height: Gap.xs + 2),
       Row(children: [
         Text('0', style: scaleStyle),
         const Spacer(),
@@ -384,14 +373,16 @@ class MessageView extends StatelessWidget {
     required this.icon,
     required this.title,
     this.body,
-    this.tone = Tone.info,
+    this.tone,
     this.actions = const [],
   });
 
   final IconData icon;
   final String title;
   final String? body;
-  final Tone tone;
+
+  /// Colours the icon; neutral when null.
+  final Tone? tone;
   final List<Widget> actions;
 
   @override
@@ -404,19 +395,23 @@ class MessageView extends StatelessWidget {
           constraints: BoxConstraints(minHeight: constraints.maxHeight - Gap.xl * 2),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(color: tone.soft, shape: BoxShape.circle),
-              child: Icon(icon, size: 44, color: tone.color),
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: tone?.soft ?? AppColors.surface,
+                shape: BoxShape.circle,
+                border: tone == null ? Border.all(color: AppColors.border) : null,
+              ),
+              child: Icon(icon, size: 30, color: tone?.color ?? AppColors.inkMuted),
             ),
             const SizedBox(height: Gap.xl),
-            Text(title, style: theme.textTheme.headlineSmall, textAlign: TextAlign.center),
+            Text(title, style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
             if (body != null) ...[
               const SizedBox(height: Gap.sm),
               Text(body!, style: theme.textTheme.bodyMedium, textAlign: TextAlign.center),
             ],
             const SizedBox(height: Gap.xxl),
-            for (final a in actions) Padding(padding: const EdgeInsets.only(bottom: Gap.md), child: a),
+            for (final a in actions) Padding(padding: const EdgeInsets.only(bottom: Gap.sm), child: a),
           ]),
         ),
       ),
@@ -433,10 +428,13 @@ class DemoBanner extends StatelessWidget {
     if (!context.read<BillRepository>().isDemo) return const SizedBox.shrink();
     return Container(
       width: double.infinity,
-      color: AppColors.amberSoft,
+      decoration: const BoxDecoration(
+        color: AppColors.amberSoft,
+        border: Border(bottom: BorderSide(color: Color(0xFFF0DFB4))),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: Gap.page, vertical: Gap.sm),
       child: Row(children: [
-        const Icon(Icons.science_rounded, color: AppColors.amberInk, size: 18),
+        const Icon(Icons.science_outlined, color: AppColors.amberInk, size: 16),
         const SizedBox(width: Gap.sm),
         Expanded(
           child: Text(context.s.t('demo_banner'),
@@ -453,11 +451,13 @@ Future<bool> confirmDialog(BuildContext context, String question, {required Stri
   final ok = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      icon: const Icon(Icons.delete_outline_rounded, color: AppColors.red, size: 36),
-      content: Text(question, style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
-      actionsAlignment: MainAxisAlignment.spaceBetween,
+      content: Text(question, style: Theme.of(context).textTheme.titleMedium),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(s.t('keep'))),
+        TextButton(
+          style: TextButton.styleFrom(foregroundColor: AppColors.inkMuted),
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(s.t('keep')),
+        ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: AppColors.red),
           onPressed: () => Navigator.pop(context, true),
@@ -500,133 +500,56 @@ class LanguageSwitch extends StatelessWidget {
   }
 }
 
-/// Illustration: a bill with a tick and a speaker, used on intro and empty home.
-class BillIllustration extends StatelessWidget {
-  const BillIllustration({super.key, this.height = 150});
-
-  final double height;
-
-  @override
-  Widget build(BuildContext context) {
-    final line = BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(4));
-    // Fixed left-to-right so the decoration is identical in both languages.
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: _illustration(line),
-    );
-  }
-
-  Widget _illustration(BoxDecoration line) {
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.primarySoft, Color(0xFFF7FAFE)],
-        ),
-        borderRadius: BorderRadius.circular(Radii.xl),
-      ),
-      child: Center(
-        child: SizedBox(
-          width: 180,
-          height: height * 0.78,
-          child: Stack(clipBehavior: Clip.none, children: [
-            Positioned.fill(
-              child: Transform.rotate(
-                angle: -0.05,
-                child: Container(
-                  padding: const EdgeInsets.all(Gap.md),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(Radii.md),
-                    boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.12), blurRadius: 24, offset: const Offset(0, 10))],
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      const Icon(Icons.bolt_rounded, color: AppColors.amber, size: 18),
-                      const SizedBox(width: 6),
-                      Container(width: 60, height: 8, decoration: line),
-                    ]),
-                    const SizedBox(height: Gap.sm),
-                    Container(width: 120, height: 7, decoration: line),
-                    const SizedBox(height: Gap.sm),
-                    Container(width: 90, height: 7, decoration: line),
-                    const Spacer(),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text('Rs 5,867', style: numberStyle(18, color: AppColors.primaryDark)),
-                    ),
-                  ]),
-                ),
-              ),
-            ),
-            const Positioned(
-              top: -14,
-              right: -18,
-              child: _Bubble(icon: Icons.check_rounded, color: AppColors.green),
-            ),
-            const Positioned(
-              bottom: -10,
-              left: -20,
-              child: _Bubble(icon: Icons.volume_up_rounded, color: AppColors.primary),
-            ),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
-class _Bubble extends StatelessWidget {
-  const _Bubble({required this.icon, required this.color});
-
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 3),
-        ),
-        child: Icon(icon, color: Colors.white, size: 20),
-      );
-}
-
-/// Numbered step row used to explain the flow.
+/// Numbered step, used in a section with dividers between steps.
 class StepRow extends StatelessWidget {
-  const StepRow({super.key, required this.number, required this.icon, required this.text});
+  const StepRow({super.key, required this.number, required this.text});
 
   final int number;
-  final IconData icon;
   final String text;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Gap.xs + 2),
+      padding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: Gap.md + 2),
       child: Row(children: [
-        Stack(clipBehavior: Clip.none, children: [
-          IconBadge(icon, color: AppColors.primary, background: AppColors.primarySoft, size: 40),
-          PositionedDirectional(
-            top: -5,
-            start: -5,
-            child: Container(
-              width: 20,
-              height: 20,
-              alignment: Alignment.center,
-              decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-              child: Text('$number', style: numberStyle(11, color: Colors.white)),
-            ),
-          ),
-        ]),
-        const SizedBox(width: Gap.lg),
-        Expanded(child: Text(text, style: Theme.of(context).textTheme.titleSmall)),
+        Container(
+          width: 26,
+          height: 26,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(color: AppColors.primarySoft, shape: BoxShape.circle),
+          child: Text('$number', style: numberStyle(13, color: AppColors.primaryDark, weight: FontWeight.w700)),
+        ),
+        const SizedBox(width: Gap.md + 2),
+        Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyLarge)),
       ]),
     );
+  }
+}
+
+/// Converts Urdu (۰-۹) and Arabic (٠-٩) digits to 0-9 and drops anything else,
+/// so users with an Urdu keyboard can still correct numbers.
+class WesternDigitsFormatter extends TextInputFormatter {
+  WesternDigitsFormatter({this.allowDecimal = false});
+
+  final bool allowDecimal;
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final buffer = StringBuffer();
+    var hasDot = false;
+    for (final r in newValue.text.runes) {
+      if (r >= 0x30 && r <= 0x39) {
+        buffer.writeCharCode(r);
+      } else if (r >= 0x6F0 && r <= 0x6F9) {
+        buffer.writeCharCode(r - 0x6F0 + 0x30);
+      } else if (r >= 0x660 && r <= 0x669) {
+        buffer.writeCharCode(r - 0x660 + 0x30);
+      } else if (allowDecimal && !hasDot && (r == 0x2E || r == 0x66B)) {
+        buffer.write('.');
+        hasDot = true;
+      }
+    }
+    final text = buffer.toString();
+    return TextEditingValue(text: text, selection: TextSelection.collapsed(offset: text.length));
   }
 }
