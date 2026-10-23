@@ -44,8 +44,8 @@ class SettingsScreen extends StatelessWidget {
               SegmentedButton<bool>(
                 showSelectedIcon: false,
                 segments: [
-                  ButtonSegment(value: true, label: Text(s.t('slow')), icon: const Icon(Icons.slow_motion_video_rounded)),
-                  ButtonSegment(value: false, label: Text(s.t('normal')), icon: const Icon(Icons.play_arrow_rounded)),
+                  ButtonSegment(value: true, label: Text(s.t('slow'))),
+                  ButtonSegment(value: false, label: Text(s.t('normal'))),
                 ],
                 selected: {settings.slowVoice},
                 onSelectionChanged: (v) => cubit.setSlowVoice(v.first),
@@ -54,51 +54,48 @@ class SettingsScreen extends StatelessWidget {
               SegmentedButton<bool>(
                 showSelectedIcon: false,
                 segments: [
-                  ButtonSegment(value: false, label: Text(s.t('normal')), icon: const Icon(Icons.text_fields_rounded)),
-                  ButtonSegment(value: true, label: Text(s.t('large')), icon: const Icon(Icons.format_size_rounded)),
+                  ButtonSegment(value: false, label: Text(s.t('normal'))),
+                  ButtonSegment(value: true, label: Text(s.t('large'))),
                 ],
                 selected: {settings.largeText},
                 onSelectionChanged: (v) => cubit.setLargeText(v.first),
               ),
               SectionTitle(s.t('privacy_section')),
               AppCard(
-                color: AppColors.surfaceAlt,
-                borderColor: AppColors.surfaceAlt,
-                padding: const EdgeInsets.all(Gap.lg),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const IconBadge(Icons.shield_rounded, color: AppColors.green, background: AppColors.greenSoft),
-                  const SizedBox(width: Gap.md),
-                  Expanded(child: Text(s.t('data_on_device'), style: theme.textTheme.bodyMedium)),
+                padding: EdgeInsets.zero,
+                child: Column(children: [
+                  Padding(
+                    padding: const EdgeInsets.all(Gap.lg),
+                    child: NoteRow(icon: Icons.lock_outline_rounded, color: AppColors.green, text: s.t('data_on_device')),
+                  ),
+                  const PanelDivider(),
+                  PanelTile(
+                    icon: Icons.delete_outline_rounded,
+                    iconColor: AppColors.red,
+                    title: s.t('clear_all'),
+                    titleColor: AppColors.red,
+                    chevron: false,
+                    onTap: () => _clearAll(context),
+                  ),
                 ]),
-              ),
-              const SizedBox(height: Gap.md),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.red,
-                  side: BorderSide(color: AppColors.red.withValues(alpha: 0.5), width: 1.5),
-                  minimumSize: const Size.fromHeight(58),
-                ),
-                icon: const Icon(Icons.delete_forever_rounded),
-                label: Text(s.t('clear_all')),
-                onPressed: () => _clearAll(context),
               ),
               SectionTitle(s.t('about')),
               AppCard(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    const AppLogo(size: 44),
+                    const AppLogo(size: 36),
                     const SizedBox(width: Gap.md),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(s.t('app_name'), style: theme.textTheme.titleMedium),
+                        Text(s.t('app_name'), style: theme.textTheme.titleSmall),
                         if (version.isNotEmpty) Text(s.t('version', {'version': version}), style: theme.textTheme.bodySmall),
                       ]),
                     ),
                   ]),
                   const SizedBox(height: Gap.md),
                   Text(s.t('tariff_version', {'version': tariffVersion}), style: theme.textTheme.bodySmall),
-                  const SizedBox(height: Gap.sm),
-                  Text(s.t('unofficial'), style: theme.textTheme.bodySmall),
+                  const SizedBox(height: Gap.xs),
+                  Text(s.t('unofficial'), style: theme.textTheme.bodySmall?.copyWith(color: AppColors.inkSubtle)),
                 ]),
               ),
             ],

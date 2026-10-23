@@ -17,16 +17,6 @@ class GlossaryScreen extends StatefulWidget {
 class _GlossaryScreenState extends State<GlossaryScreen> {
   late final TtsService _tts;
 
-  static const _icons = {
-    'fuel': Icons.local_gas_station_rounded,
-    'calendar': Icons.calendar_month_rounded,
-    'tax': Icons.account_balance_rounded,
-    'fixed': Icons.push_pin_rounded,
-    'history': Icons.history_rounded,
-    'late': Icons.schedule_rounded,
-    'tv': Icons.tv_off_rounded,
-  };
-
   @override
   void initState() {
     super.initState();
@@ -46,39 +36,41 @@ class _GlossaryScreenState extends State<GlossaryScreen> {
     final items = s.glossary;
     return Scaffold(
       appBar: AppBar(title: Text(s.t('glossary'))),
-      body: ListView.separated(
+      body: ListView(
         padding: EdgeInsets.fromLTRB(Gap.page, Gap.sm, Gap.page, bottomPadding(context)),
-        itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(height: Gap.md),
-        itemBuilder: (context, i) {
-          final item = items[i];
-          return AppCard(
-            padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.lg, Gap.sm, Gap.lg),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              IconBadge(
-                _icons[item.icon] ?? Icons.receipt_long_rounded,
-                color: AppColors.primary,
-                background: AppColors.primarySoft,
-                size: 36,
-              ),
-              const SizedBox(width: Gap.md),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(item.title, style: theme.textTheme.titleMedium),
-                  const SizedBox(height: Gap.xs),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: Gap.sm, vertical: 2),
-                    decoration: BoxDecoration(color: AppColors.surfaceAlt, borderRadius: BorderRadius.circular(6)),
-                    child: Text(item.code, style: numberStyle(12, color: AppColors.inkMuted, weight: FontWeight.w600)),
-                  ),
-                  const SizedBox(height: Gap.sm),
-                  Text(item.meaning, style: theme.textTheme.bodyMedium),
-                ]),
-              ),
-              PlayButton(id: 'glossary_${item.code}', text: '${item.title}. ${item.meaning}'),
+        children: [
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(children: [
+              for (final (i, item) in items.indexed) ...[
+                if (i > 0) const PanelDivider(),
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.md, Gap.xs, Gap.md),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Wrap(spacing: Gap.sm, runSpacing: Gap.xs, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                          Text(item.title, style: theme.textTheme.titleSmall),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: Gap.xs + 2, vertical: 1),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.borderStrong),
+                              borderRadius: BorderRadius.circular(Radii.xs),
+                            ),
+                            child: Text(item.code, style: numberStyle(11.5, color: AppColors.inkMuted, weight: FontWeight.w600)),
+                          ),
+                        ]),
+                        const SizedBox(height: Gap.xs),
+                        Text(item.meaning, style: theme.textTheme.bodyMedium),
+                      ]),
+                    ),
+                    PlayButton(id: 'glossary_${item.code}', text: '${item.title}. ${item.meaning}'),
+                  ]),
+                ),
+              ],
             ]),
-          );
-        },
+          ),
+        ],
       ),
     );
   }

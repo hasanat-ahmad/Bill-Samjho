@@ -241,8 +241,8 @@ class _LookupScreenState extends State<LookupScreen> {
               ChoiceChip(
                 showCheckmark: false,
                 selected: _disco == d,
-                selectedColor: AppColors.primarySoft,
-                label: Text(d.code, style: numberStyle(14, weight: FontWeight.w700, color: _disco == d ? AppColors.primaryDark : AppColors.ink)),
+                side: BorderSide(color: _disco == d ? AppColors.primary : AppColors.borderStrong),
+                label: Text(d.code, style: numberStyle(13.5, color: _disco == d ? AppColors.primaryDark : AppColors.ink)),
                 tooltip: d.city,
                 onSelected: (_) => setState(() => _disco = d),
               ),
@@ -253,14 +253,13 @@ class _LookupScreenState extends State<LookupScreen> {
             keyboardType: TextInputType.number,
             textDirection: TextDirection.ltr,
             maxLength: 18,
-            style: numberStyle(19, weight: FontWeight.w600),
+            style: numberStyle(19, letterSpacing: 0.5),
             inputFormatters: [_ReferenceFormatter()],
             decoration: InputDecoration(
               hintText: s.t('reference_hint'),
-              hintStyle: numberStyle(19, weight: FontWeight.w400, color: AppColors.inkMuted),
+              hintStyle: numberStyle(19, weight: FontWeight.w400, color: AppColors.inkSubtle, letterSpacing: 0.5),
               counterText: '',
               errorText: _formError,
-              prefixIcon: const Icon(Icons.pin_rounded, color: AppColors.primary),
             ),
             onSubmitted: (_) => _open(),
           ),
@@ -275,11 +274,11 @@ class _LookupScreenState extends State<LookupScreen> {
             onSelectionChanged: (v) => setState(() => _rural = v.first),
           ),
           const SizedBox(height: Gap.xl),
-          PrimaryButton(label: s.t('open_bill'), icon: Icons.open_in_browser_rounded, onPressed: _open),
+          PrimaryButton(label: s.t('open_bill'), onPressed: _open),
           const SizedBox(height: Gap.xl),
-          _Note(icon: Icons.lock_rounded, color: AppColors.green, text: s.t('lookup_privacy')),
+          NoteRow(icon: Icons.lock_outline_rounded, color: AppColors.green, text: s.t('lookup_privacy')),
           const SizedBox(height: Gap.md),
-          _Note(icon: Icons.info_rounded, color: AppColors.inkMuted, text: s.t('kelectric_note')),
+          NoteRow(icon: Icons.info_outline_rounded, text: s.t('kelectric_note')),
         ],
       ),
     );
@@ -302,15 +301,15 @@ class _LookupScreenState extends State<LookupScreen> {
       body: Column(children: [
         Container(
           width: double.infinity,
-          color: AppColors.primarySoft,
-          padding: const EdgeInsets.symmetric(horizontal: Gap.page, vertical: Gap.sm),
+          decoration: const BoxDecoration(
+            color: AppColors.surface,
+            border: Border(bottom: BorderSide(color: AppColors.border)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: Gap.page, vertical: Gap.sm + 2),
           child: Row(children: [
-            const Icon(Icons.verified_user_rounded, color: AppColors.primaryDark, size: 22),
+            const Icon(Icons.verified_user_outlined, color: AppColors.green, size: 18),
             const SizedBox(width: Gap.sm),
-            Expanded(
-              child: Text(s.t(_billVisible ? 'lookup_bill_open' : 'lookup_tap_search'),
-                  style: theme.textTheme.bodySmall?.copyWith(color: AppColors.primaryDark)),
-            ),
+            Expanded(child: Text(s.t(_billVisible ? 'lookup_bill_open' : 'lookup_tap_search'), style: theme.textTheme.bodySmall)),
           ]),
         ),
         if (_pageLoading) const LinearProgressIndicator(minHeight: 3),
@@ -339,41 +338,31 @@ class _LookupScreenState extends State<LookupScreen> {
               : WebViewWidget(controller: _web!),
         ),
       ]),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(Gap.page, Gap.sm, Gap.page, Gap.md),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            if (!_billVisible && _pageError == null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: Gap.sm),
-                child: Text(s.t('lookup_waiting'), style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
+      bottomNavigationBar: DecoratedBox(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(Gap.page, Gap.md, Gap.page, Gap.md),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              if (!_billVisible && _pageError == null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: Gap.sm),
+                  child: Text(s.t('lookup_waiting'), style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
+                ),
+              PrimaryButton(
+                label: s.t('lookup_explain'),
+                busy: _reading,
+                onPressed: _billVisible && _pageError == null ? _read : null,
               ),
-            PrimaryButton(
-              label: s.t('lookup_explain'),
-              icon: Icons.auto_awesome_rounded,
-              busy: _reading,
-              onPressed: _billVisible && _pageError == null ? _read : null,
-            ),
-          ]),
+            ]),
+          ),
         ),
       ),
     );
   }
-}
-
-class _Note extends StatelessWidget {
-  const _Note({required this.icon, required this.color, required this.text});
-
-  final IconData icon;
-  final Color color;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(width: Gap.sm),
-        Expanded(child: Text(text, style: Theme.of(context).textTheme.bodySmall)),
-      ]);
 }
 
 /// Digits only (Urdu digits converted), grouped as "07 11234 1234567".
