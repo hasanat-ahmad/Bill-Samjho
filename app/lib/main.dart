@@ -26,11 +26,8 @@ import 'services/tts_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Release builds write nothing to the device log.
   if (kReleaseMode) debugPrint = (String? message, {int? wrapWidth}) {};
 
-  // Portrait is locked in AndroidManifest.xml; awaiting
-  // setPreferredOrientations here would delay the first frame.
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
