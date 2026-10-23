@@ -61,31 +61,24 @@ class HistoryScreen extends StatelessWidget {
                   children: [
                     if (details.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: Gap.sm),
-                        child: Row(children: [
-                          const Icon(Icons.electric_meter_rounded, color: AppColors.inkMuted, size: 22),
-                          const SizedBox(width: Gap.sm),
-                          Expanded(child: Text(details, style: theme.textTheme.bodySmall, textDirection: TextDirection.ltr)),
-                        ]),
+                        padding: const EdgeInsetsDirectional.only(start: Gap.xs, top: Gap.xs),
+                        child: Text(
+                          details,
+                          style: numberStyle(13.5, color: AppColors.inkMuted, weight: FontWeight.w500),
+                          textDirection: TextDirection.ltr,
+                        ),
                       ),
                     if (connection?.referenceNo != null && Disco.find(connection?.disco) != null) ...[
-                      const SizedBox(height: Gap.lg),
+                      const SizedBox(height: Gap.md),
                       AppCard(
-                        color: AppColors.primarySoft,
-                        borderColor: AppColors.primarySoft,
-                        padding: const EdgeInsets.all(Gap.lg),
-                        onTap: () => context.push('/lookup/${connection!.id}?latest=1'),
-                        child: Row(children: [
-                          const IconBadge(Icons.travel_explore_rounded, color: AppColors.primary, background: Colors.white),
-                          const SizedBox(width: Gap.md),
-                          Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(s.t('get_latest'), style: theme.textTheme.titleMedium?.copyWith(color: AppColors.primaryDark)),
-                              Text(s.t('get_latest_hint'), style: theme.textTheme.bodySmall),
-                            ]),
-                          ),
-                          const Icon(Icons.chevron_right_rounded, color: AppColors.primaryDark),
-                        ]),
+                        padding: EdgeInsets.zero,
+                        child: PanelTile(
+                          icon: Icons.cloud_download_outlined,
+                          iconColor: AppColors.primary,
+                          title: s.t('get_latest'),
+                          subtitle: s.t('get_latest_hint'),
+                          onTap: () => context.push('/lookup/${connection!.id}?latest=1'),
+                        ),
                       ),
                     ],
                     if (state.chart.isNotEmpty) ...[
@@ -100,11 +93,21 @@ class HistoryScreen extends StatelessWidget {
                       ),
                     ],
                     SectionTitle(s.t('history_title')),
-                    for (final b in state.bills) ...[
-                      _BillTile(b),
-                      const SizedBox(height: Gap.md),
-                    ],
-                    Text(s.t('long_press_hint'), style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
+                    AppCard(
+                      padding: EdgeInsets.zero,
+                      child: Column(children: [
+                        for (final (i, b) in state.bills.indexed) ...[
+                          if (i > 0) const PanelDivider(),
+                          _BillTile(b),
+                        ],
+                      ]),
+                    ),
+                    const SizedBox(height: Gap.md),
+                    Text(
+                      s.t('long_press_hint'),
+                      style: theme.textTheme.bodySmall?.copyWith(color: AppColors.inkSubtle),
+                      textAlign: TextAlign.center,
+                    ),
                   ],
                 ),
         );
@@ -145,7 +148,7 @@ class _LegendItem extends StatelessWidget {
                 for (var i = 0; i < 3; i++)
                   Container(width: 6, height: 3, margin: const EdgeInsets.only(right: 2), color: color),
               ])
-            : Container(width: 14, height: 14, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4))),
+            : Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: Gap.sm),
         Flexible(child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
       ]);
@@ -168,38 +171,39 @@ class _BillTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.s;
     final theme = Theme.of(context);
-    return AppCard(
-      padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.md, Gap.xs, Gap.md),
+    return InkWell(
       onTap: () => context.push('/result/${bill.id}'),
       onLongPress: () => _delete(context),
-      child: Row(children: [
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(formatMonth(bill.data.billMonth, s), style: theme.textTheme.titleMedium),
-            const SizedBox(height: Gap.xs),
-            Text(
-              '${formatNumber(bill.data.units)} ${s.t('units')}  ·  ${formatAmount(bill.data.totalDue, s)}',
-              style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: Gap.sm),
-            VerdictPill(bill.verdict),
-          ]),
-        ),
-        PopupMenuButton<void>(
-          tooltip: s.t('more_options'),
-          icon: const Icon(Icons.more_vert_rounded, color: AppColors.inkMuted),
-          itemBuilder: (_) => [
-            PopupMenuItem(
-              onTap: () => _delete(context),
-              child: Row(children: [
-                const Icon(Icons.delete_outline_rounded, color: AppColors.red),
-                const SizedBox(width: Gap.md),
-                Text(s.t('delete'), style: theme.textTheme.bodyLarge?.copyWith(color: AppColors.red)),
-              ]),
-            ),
-          ],
-        ),
-      ]),
+      child: Padding(
+        padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.md, 0, Gap.md),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(formatMonth(bill.data.billMonth, s), style: theme.textTheme.titleSmall),
+              const SizedBox(height: 2),
+              Text(
+                '${formatNumber(bill.data.units)} ${s.t('units')}  ·  ${formatAmount(bill.data.totalDue, s)}',
+                style: theme.textTheme.bodySmall,
+              ),
+            ]),
+          ),
+          VerdictPill(bill.verdict),
+          PopupMenuButton<void>(
+            tooltip: s.t('more_options'),
+            icon: const Icon(Icons.more_vert_rounded, color: AppColors.inkSubtle, size: 20),
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                onTap: () => _delete(context),
+                child: Row(children: [
+                  const Icon(Icons.delete_outline_rounded, color: AppColors.red),
+                  const SizedBox(width: Gap.md),
+                  Text(s.t('delete'), style: theme.textTheme.bodyLarge?.copyWith(color: AppColors.red)),
+                ]),
+              ),
+            ],
+          ),
+        ]),
+      ),
     );
   }
 }
@@ -217,7 +221,7 @@ class _UnitsChart extends StatelessWidget {
     final interval = math.max(50, (maxUnits / 4 / 50).ceil() * 50).toDouble();
     // Label every bar when few, otherwise every other one so names fit.
     final labelEvery = data.length > 6 ? 2 : 1;
-    final axisStyle = Theme.of(context).textTheme.bodySmall!.copyWith(fontSize: 13, height: 1.2);
+    final axisStyle = Theme.of(context).textTheme.bodySmall!.copyWith(fontSize: 12, height: 1.2, color: AppColors.inkSubtle);
 
     // Time runs left to right in both languages, like the printed bill table.
     return Directionality(
@@ -237,14 +241,14 @@ class _UnitsChart extends StatelessWidget {
               BarChartGroupData(x: i, barRods: [
                 BarChartRodData(
                   toY: units.toDouble(),
-                  width: data.length > 8 ? 14 : 22,
+                  width: data.length > 8 ? 12 : 18,
                   color: units > limit ? AppColors.red : AppColors.primary,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
                 ),
               ]),
           ],
           extraLinesData: ExtraLinesData(horizontalLines: [
-            HorizontalLine(y: limit.toDouble(), color: AppColors.red, strokeWidth: 2, dashArray: [8, 5]),
+            HorizontalLine(y: limit.toDouble(), color: AppColors.red, strokeWidth: 1.2, dashArray: [6, 4]),
           ]),
           titlesData: FlTitlesData(
             topTitles: const AxisTitles(),
@@ -260,7 +264,7 @@ class _UnitsChart extends StatelessWidget {
                     ? const SizedBox.shrink()
                     : SideTitleWidget(
                         meta: meta,
-                        child: Text(meta.formattedValue, style: numberStyle(13, color: AppColors.inkMuted, weight: FontWeight.w500)),
+                        child: Text(meta.formattedValue, style: numberStyle(12, color: AppColors.inkSubtle, weight: FontWeight.w500)),
                       ),
               ),
             ),
