@@ -36,6 +36,12 @@ After a bill is read, the result screen also offers:
 
 The reference-number lookup works without any backend. Photo scanning needs `EXTRACT_URL`; without it, scanning says it is not available. Sample data appears only with `--dart-define=USE_MOCK_API=true`, always with a "demo mode" banner.
 
+The UI font, General Sans, may be embedded in the app but not shared as files (ITF Free Font License), so it is not in git. Fetch it once before the first build:
+
+```sh
+scripts/fetch_fonts.sh
+```
+
 ```sh
 cd app
 flutter pub get
