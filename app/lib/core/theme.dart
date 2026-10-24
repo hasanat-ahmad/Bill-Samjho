@@ -3,34 +3,65 @@ import 'package:flutter/material.dart';
 import '../data/models/finding.dart';
 import 'i18n.dart';
 
-/// Colour tokens. One brand colour; status colours appear only on small
-/// indicators. Text colours pass WCAG AA on white and on [canvas].
+/// Colour tokens: Coral (Hallmark) — warm paper, near-black ink, one coral.
+/// Paper objects are cotton stock on the paper page (or the desk); actions
+/// are ink. Status colours appear only on small indicators. Text colours pass
+/// WCAG AA on [canvas] and [surface].
 class AppColors {
-  static const primary = Color(0xFF0A5C8E);
-  static const primaryDark = Color(0xFF07466D);
-  static const primarySoft = Color(0xFFE6EFF5);
+  /// The ink board: primary actions, the user's chat cards, key icons.
+  static const primary = Color(0xFF1F1917);
+  static const primaryDark = Color(0xFF1D1614);
 
-  static const ink = Color(0xFF16202A);
-  static const inkMuted = Color(0xFF56616C);
-  static const inkSubtle = Color(0xFF7D8791);
+  /// Pressed groove / chosen segment.
+  static const primarySoft = Color(0xFFE8E1DD);
 
-  /// Page background; [surface] sections sit on it.
-  static const canvas = Color(0xFFF2F4F6);
-  static const surface = Colors.white;
-  static const border = Color(0xFFE2E6EA);
-  static const borderStrong = Color(0xFFCDD3D9);
+  /// Coral: focus, links and the pressed "check this" ink.
+  static const coral = Color(0xFFEF8B7B);
+  static const coralDeep = Color(0xFFBB3D31);
 
-  static const green = Color(0xFF1F7A4A);
-  static const greenSoft = Color(0xFFE6F2EB);
-  static const greenInk = Color(0xFF17603A);
+  static const ink = Color(0xFF1D1614);
+  static const inkMuted = Color(0xFF615955);
+  static const inkSubtle = Color(0xFF857C77);
 
-  static const amber = Color(0xFFC98A00);
-  static const amberSoft = Color(0xFFFBF2DC);
-  static const amberInk = Color(0xFF7A4B00);
+  /// Page background (paper); [surface] sections (cotton stock) sit on it.
+  static const canvas = Color(0xFFF8F4F1);
+  static const surface = Color(0xFFFDFBF8);
 
-  static const red = Color(0xFFC0362C);
-  static const redSoft = Color(0xFFFAE8E6);
-  static const redInk = Color(0xFF9A2A22);
+  /// The desk under a document (bill result, home, chat).
+  static const desk = Color(0xFFF0EBE7);
+  static const boardType = Color(0xFFF6F3EF);
+  static const border = Color(0xFFE2DCD8);
+  static const borderStrong = Color(0xFFC7BFBA);
+
+  /// Shade for paper edges and the cast falling right (light from the left).
+  static const shade = Color(0xFF402E25);
+
+  static const green = Color(0xFF21763C);
+  static const greenSoft = Color(0xFFE4EFE6);
+  static const greenInk = Color(0xFF1A5E30);
+
+  /// The "check this" tone: coral ink in this theme.
+  static const amber = coralDeep;
+  static const amberSoft = Color(0xFFF7E5E0);
+  static const amberInk = Color(0xFF8E2C23);
+
+  static const red = Color(0xFFBE2323);
+  static const redSoft = Color(0xFFF7E1DF);
+  static const redInk = Color(0xFF8C1B1B);
+}
+
+/// Paper edges: a hairline of shade and a soft cast falling right, as if lit
+/// from the left.
+class Paper {
+  static final edge = Border.all(color: AppColors.shade.withValues(alpha: 0.2), width: 0.5);
+  static final cast = [
+    BoxShadow(color: AppColors.shade.withValues(alpha: 0.12), offset: const Offset(0, 1)),
+    BoxShadow(color: AppColors.shade.withValues(alpha: 0.22), offset: const Offset(5, 4), blurRadius: 10, spreadRadius: -6),
+  ];
+  static final castLifted = [
+    BoxShadow(color: AppColors.shade.withValues(alpha: 0.12), offset: const Offset(0, 1)),
+    BoxShadow(color: AppColors.shade.withValues(alpha: 0.24), offset: const Offset(10, 8), blurRadius: 18, spreadRadius: -8),
+  ];
 }
 
 /// Spacing scale (4-point grid).
@@ -46,8 +77,10 @@ class Gap {
 
 class Radii {
   static const xs = 6.0;
-  static const sm = 10.0;
-  static const md = 12.0;
+
+  /// Paper stock and letterpress controls.
+  static const sm = 8.0;
+  static const md = 8.0;
   static const lg = 16.0;
 }
 
@@ -63,7 +96,7 @@ class Tone {
   static const normal = Tone(AppColors.green, AppColors.greenSoft, AppColors.greenInk, Icons.check_circle_rounded);
   static const check = Tone(AppColors.amber, AppColors.amberSoft, AppColors.amberInk, Icons.error_rounded);
   static const wrong = Tone(AppColors.red, AppColors.redSoft, AppColors.redInk, Icons.cancel_rounded);
-  static const info = Tone(AppColors.primary, AppColors.primarySoft, AppColors.primaryDark, Icons.info_rounded);
+  static const info = Tone(AppColors.inkMuted, AppColors.primarySoft, AppColors.ink, Icons.info_outline_rounded);
 
   static Tone ofVerdict(Verdict v) => switch (v) {
         Verdict.normal => normal,
@@ -78,22 +111,29 @@ class Tone {
       };
 }
 
-/// Numbers (amounts, units) in a plain Latin font with even-width digits in
-/// both languages, so Western digits read clearly and line up (NFR-02).
+const _latinFamily = 'GeneralSans';
+const _monoFamily = 'GeistMono';
+
+/// Numbers (amounts, units) in a Latin face in both languages, so Western
+/// digits read clearly (NFR-02). [mono] sets figures that line up in a column
+/// (charges, readings) in Geist Mono; a lone amount stays General Sans.
 TextStyle numberStyle(
   double size, {
   Color color = AppColors.ink,
   FontWeight weight = FontWeight.w600,
   double letterSpacing = 0,
+  bool mono = false,
 }) =>
     TextStyle(
-      fontFamily: 'Roboto',
+      fontFamily: mono ? _monoFamily : _latinFamily,
       fontSize: size,
-      fontWeight: weight,
+      fontWeight: mono ? FontWeight.w400 : weight,
       color: color,
       height: 1.15,
       letterSpacing: letterSpacing,
       fontFeatures: const [FontFeature.tabularFigures()],
+      // Urdu words beside the figures ("روپے", month names) stay Nastaliq.
+      fontFamilyFallback: const [_urduFamily],
     );
 
 const _urduFamily = 'NotoNastaliqUrdu';
@@ -109,7 +149,7 @@ TextTheme _textTheme(AppLanguage lang) {
     double letterSpacing = 0,
   }) =>
       TextStyle(
-        fontFamily: urdu ? _urduFamily : 'Roboto',
+        fontFamily: urdu ? _urduFamily : _latinFamily,
         fontSize: size,
         fontWeight: weight,
         // The Nastaliq font is variable; select its weight explicitly.
@@ -125,10 +165,10 @@ TextTheme _textTheme(AppLanguage lang) {
 
   // Standard Android sizes; Settings → Text size → Large scales them up.
   return TextTheme(
-    displaySmall: style(28, FontWeight.w700, 1.15, 1.6, letterSpacing: -0.4),
-    headlineMedium: style(24, FontWeight.w700, 1.2, 1.7, letterSpacing: -0.3),
-    headlineSmall: style(20, FontWeight.w600, 1.25, 1.75, letterSpacing: -0.2),
-    titleLarge: style(18, FontWeight.w600, 1.3, 1.8),
+    displaySmall: style(28, FontWeight.w600, 1.08, 1.6, letterSpacing: -0.84),
+    headlineMedium: style(24, FontWeight.w600, 1.12, 1.7, letterSpacing: -0.72),
+    headlineSmall: style(20, FontWeight.w600, 1.2, 1.75, letterSpacing: -0.4),
+    titleLarge: style(18, FontWeight.w600, 1.3, 1.8, letterSpacing: -0.2),
     titleMedium: style(16, FontWeight.w600, 1.35, 1.85),
     titleSmall: style(14.5, FontWeight.w600, 1.35, 1.9),
     bodyLarge: style(15.5, FontWeight.w400, 1.45, 2.0),
@@ -146,7 +186,7 @@ ThemeData buildTheme(AppLanguage lang) {
   final scheme = ColorScheme.fromSeed(
     seedColor: AppColors.primary,
     primary: AppColors.primary,
-    onPrimary: Colors.white,
+    onPrimary: AppColors.boardType,
     primaryContainer: AppColors.primarySoft,
     onPrimaryContainer: AppColors.primaryDark,
     secondaryContainer: AppColors.primarySoft,
@@ -173,7 +213,7 @@ ThemeData buildTheme(AppLanguage lang) {
     useMaterial3: true,
     colorScheme: scheme,
     textTheme: text,
-    fontFamily: lang.isRtl ? _urduFamily : 'Roboto',
+    fontFamily: lang.isRtl ? _urduFamily : _latinFamily,
     scaffoldBackgroundColor: AppColors.canvas,
     splashFactory: InkRipple.splashFactory,
     visualDensity: VisualDensity.standard,
@@ -196,7 +236,9 @@ ThemeData buildTheme(AppLanguage lang) {
         padding: buttonPadding,
         shape: buttonShape,
         textStyle: text.labelLarge,
-        elevation: 0,
+        // The ink board casts onto the paper like the cards do.
+        elevation: 1,
+        shadowColor: AppColors.shade.withValues(alpha: 0.6),
         disabledBackgroundColor: AppColors.border,
         disabledForegroundColor: AppColors.inkSubtle,
       ),
@@ -207,9 +249,12 @@ ThemeData buildTheme(AppLanguage lang) {
         padding: buttonPadding,
         shape: buttonShape,
         textStyle: text.labelLarge,
+        // Letterpress card: cotton stock with an edge and a cast.
         foregroundColor: AppColors.ink,
         backgroundColor: AppColors.surface,
-        side: const BorderSide(color: AppColors.borderStrong),
+        side: BorderSide(color: AppColors.shade.withValues(alpha: 0.22), width: 0.5),
+        elevation: 1,
+        shadowColor: AppColors.shade.withValues(alpha: 0.5),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -240,11 +285,11 @@ ThemeData buildTheme(AppLanguage lang) {
       contentPadding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: Gap.md + 2),
       hintStyle: text.bodyMedium?.copyWith(color: AppColors.inkSubtle),
       labelStyle: text.bodyMedium,
-      floatingLabelStyle: text.bodyMedium?.copyWith(color: AppColors.primary),
-      border: inputBorder(AppColors.borderStrong),
-      enabledBorder: inputBorder(AppColors.borderStrong),
+      floatingLabelStyle: text.bodyMedium?.copyWith(color: AppColors.coralDeep),
+      border: inputBorder(AppColors.inkMuted),
+      enabledBorder: inputBorder(AppColors.inkMuted),
       disabledBorder: inputBorder(AppColors.border),
-      focusedBorder: inputBorder(AppColors.primary, 1.5),
+      focusedBorder: inputBorder(AppColors.coralDeep, 2),
       errorBorder: inputBorder(AppColors.red),
       focusedErrorBorder: inputBorder(AppColors.red, 1.5),
       errorStyle: text.bodySmall?.copyWith(color: AppColors.red),
@@ -291,7 +336,7 @@ ThemeData buildTheme(AppLanguage lang) {
       behavior: SnackBarBehavior.floating,
       backgroundColor: AppColors.ink,
       contentTextStyle: text.bodyMedium?.copyWith(color: Colors.white),
-      actionTextColor: const Color(0xFF9CCBEA),
+      actionTextColor: AppColors.coral,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.sm)),
     ),
     dividerTheme: const DividerThemeData(color: AppColors.border, thickness: 1, space: 1),
