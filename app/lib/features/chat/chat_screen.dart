@@ -37,11 +37,6 @@ class _ChatScreenState extends State<ChatScreen> {
   /// Text already typed when voice typing started; speech is added after it.
   String _typed = '';
 
-  static final _pill = OutlineInputBorder(
-    borderRadius: BorderRadius.circular(24),
-    borderSide: BorderSide.none,
-  );
-
   /// Counts listening sessions. The recognizer can deliver a late final
   /// result after the session ended (or after the question was sent); those
   /// carry an old number and are ignored, so the box stays clear.
@@ -126,6 +121,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final s = context.s;
     final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: AppColors.desk,
       appBar: AppBar(title: Text(s.t('chat_title'))),
       body: BlocConsumer<ChatCubit, ChatState>(
         listener: (_, _) => _scrollToEnd(),
@@ -148,11 +144,15 @@ class _ChatScreenState extends State<ChatScreen> {
                     const SizedBox(height: Gap.sm),
                     Wrap(spacing: Gap.sm, runSpacing: Gap.sm, children: [
                       for (final q in suggestions)
-                        ActionChip(
-                          shape: const StadiumBorder(),
-                          padding: const EdgeInsets.symmetric(horizontal: Gap.xs, vertical: Gap.xs),
-                          label: Text(q, style: theme.textTheme.labelMedium?.copyWith(color: AppColors.primaryDark)),
+                        // Suggestions are letterpress cards, like the other cards.
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 48),
+                            padding: const EdgeInsets.symmetric(horizontal: Gap.md),
+                            textStyle: theme.textTheme.labelMedium,
+                          ),
                           onPressed: state.busy ? null : () => _send(q),
+                          child: Text(q),
                         ),
                     ]),
                   ],
@@ -223,12 +223,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       decoration: InputDecoration(
                         hintText: s.t(_listening ? 'dictate_listening' : 'chat_hint'),
                         counterText: '',
-                        fillColor: AppColors.canvas,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: Gap.lg, vertical: Gap.md),
-                        border: _pill,
-                        enabledBorder: _pill,
-                        disabledBorder: _pill,
-                        focusedBorder: _pill.copyWith(borderSide: const BorderSide(color: AppColors.primary)),
                       ),
                       onSubmitted: (_) => _send(),
                     ),
@@ -249,6 +243,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       }
                       return IconButton.filled(
                         tooltip: s.t('chat_send'),
+                        style: _MicButton.square,
                         onPressed: state.busy || off ? null : _send,
                         icon: const Icon(Icons.send_rounded),
                       );
@@ -277,9 +272,11 @@ class _Bubble extends StatelessWidget {
     final bubble = Container(
       constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
       padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.sm + 2),
+      // Your question on the ink board; the answer on cotton stock.
       decoration: BoxDecoration(
         color: fromUser ? AppColors.primary : AppColors.surface,
-        border: fromUser ? null : Border.all(color: AppColors.border),
+        border: fromUser ? null : Paper.edge,
+        boxShadow: Paper.cast,
         borderRadius: BorderRadiusDirectional.only(
           topStart: const Radius.circular(Radii.md),
           topEnd: const Radius.circular(Radii.md),
@@ -289,7 +286,7 @@ class _Bubble extends StatelessWidget {
       ),
       child: SelectableText(
         text,
-        style: theme.textTheme.bodyLarge?.copyWith(color: fromUser ? Colors.white : AppColors.ink),
+        style: theme.textTheme.bodyLarge?.copyWith(color: fromUser ? AppColors.boardType : AppColors.ink),
       ),
     );
     return Row(
@@ -308,6 +305,11 @@ class _Bubble extends StatelessWidget {
 class _MicButton extends StatelessWidget {
   const _MicButton({required this.listening, required this.level, required this.tooltip, required this.onPressed});
 
+  /// Chat controls are pressed square cards, like the app's buttons.
+  static final square = IconButton.styleFrom(
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Radii.sm)),
+  );
+
   final bool listening;
   final ValueListenable<double> level;
   final String tooltip;
@@ -316,20 +318,25 @@ class _MicButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!listening) {
-      return IconButton.filledTonal(tooltip: tooltip, onPressed: onPressed, icon: const Icon(Icons.mic_rounded));
+      return IconButton.filled(
+        tooltip: tooltip,
+        style: square,
+        onPressed: onPressed,
+        icon: const Icon(Icons.mic_none_rounded),
+      );
     }
     return ValueListenableBuilder(
       valueListenable: level,
       builder: (context, v, child) => DecoratedBox(
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(Radii.sm),
           boxShadow: [BoxShadow(color: AppColors.red.withValues(alpha: 0.25), spreadRadius: 2 + 8 * v)],
         ),
         child: child,
       ),
       child: IconButton.filled(
         tooltip: tooltip,
-        style: IconButton.styleFrom(backgroundColor: AppColors.red),
+        style: square.copyWith(backgroundColor: const WidgetStatePropertyAll(AppColors.red)),
         onPressed: onPressed,
         icon: const Icon(Icons.stop_rounded),
       ),
@@ -347,7 +354,8 @@ class _Typing extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.md),
           decoration: BoxDecoration(
             color: AppColors.surface,
-            border: Border.all(color: AppColors.border),
+            border: Paper.edge,
+            boxShadow: Paper.cast,
             borderRadius: BorderRadius.circular(Radii.md),
           ),
           child: const SizedBox(width: 36, height: 12, child: LinearProgressIndicator(minHeight: 4)),
