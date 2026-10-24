@@ -96,7 +96,7 @@
     "meter_title": "{limit}-unit limit",
     "findings_title": "What we found",
     "next_steps": "Next steps",
-    "charges_title": "Charges",
+    "bill_for": "Bill for {month}",
     "charge_energy": "Cost of electricity ({units} units)",
     "charge_fixed": "Fixed charges",
     "charge_fpa": "Fuel price adjustment (FPA)",
