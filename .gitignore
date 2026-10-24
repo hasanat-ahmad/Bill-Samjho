@@ -17,3 +17,7 @@ app/android/build/
 
 # Superdesign design-tool workspace (code context dumps, temp HTML)
 .superdesign/
+
+# General Sans: licence allows embedding in the app, not sharing the files.
+# Fetch with scripts/fetch_fonts.sh.
+app/assets/fonts/GeneralSans-*.otf
