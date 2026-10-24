@@ -46,9 +46,9 @@ class _LogoPainter extends CustomPainter {
       return path..close();
     }
 
-    canvas.drawPath(poly([36, 28, 64, 28, 74, 38, 74, 80, 36, 80]), Paint()..color = Colors.white);
-    canvas.drawPath(poly([64, 28, 64, 38, 74, 38]), Paint()..color = const Color(0xFFBBDEFB));
-    canvas.drawPath(poly([58, 36, 44, 57, 53, 57, 49, 72, 64, 50, 55, 50]), Paint()..color = const Color(0xFFF9A825));
+    canvas.drawPath(poly([36, 28, 64, 28, 74, 38, 74, 80, 36, 80]), Paint()..color = AppColors.surface);
+    canvas.drawPath(poly([64, 28, 64, 38, 74, 38]), Paint()..color = AppColors.borderStrong);
+    canvas.drawPath(poly([58, 36, 44, 57, 53, 57, 49, 72, 64, 50, 55, 50]), Paint()..color = AppColors.coral);
     canvas.restore();
   }
 
@@ -56,7 +56,7 @@ class _LogoPainter extends CustomPainter {
   bool shouldRepaint(_LogoPainter oldDelegate) => false;
 }
 
-/// White section on the grey page; optionally tappable.
+/// A paper section (cotton stock) on the page; optionally tappable.
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -77,17 +77,22 @@ class AppCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Radii.md),
-        side: borderColor == null ? BorderSide.none : BorderSide(color: borderColor!),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onLongPress,
-        child: Padding(padding: padding, child: child),
+    // Cotton stock: a hairline edge and a cast falling right, as if lit from
+    // the left.
+    return DecoratedBox(
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(Radii.md), boxShadow: Paper.cast),
+      child: Material(
+        color: color,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Radii.md),
+          side: borderColor == null ? Paper.edge.top : BorderSide(color: borderColor!),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Padding(padding: padding, child: child),
+        ),
       ),
     );
   }
@@ -212,14 +217,21 @@ class VerdictPill extends StatelessWidget {
     return Semantics(
       label: label,
       excludeSemantics: true,
-      child: Container(
-        padding: const EdgeInsetsDirectional.fromSTEB(Gap.sm, 3, Gap.sm + 2, 3),
-        decoration: BoxDecoration(color: tone.soft, borderRadius: BorderRadius.circular(999)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(tone.icon, color: tone.color, size: 15),
-          const SizedBox(width: 5),
-          Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: tone.ink, fontSize: 12.5)),
-        ]),
+      // Pressed into the paper like a rubber stamp, slightly tilted.
+      child: Transform.rotate(
+        angle: -0.06,
+        child: Container(
+          padding: const EdgeInsetsDirectional.fromSTEB(Gap.sm, Gap.xs, Gap.md, Gap.xs),
+          decoration: BoxDecoration(
+            border: Border.all(color: tone.color, width: 1.8),
+            borderRadius: BorderRadius.circular(Radii.xs),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(tone.icon, color: tone.color, size: 16),
+            const SizedBox(width: Gap.xs),
+            Text(label, style: Theme.of(context).textTheme.labelLarge?.copyWith(color: tone.color)),
+          ]),
+        ),
       ),
     );
   }
@@ -309,7 +321,7 @@ class UnitMeter extends StatelessWidget {
     required this.units,
     required this.limit,
     required this.nearLimit,
-    this.height = 6,
+    this.height = 12,
     this.showScale = false,
   });
 
@@ -328,13 +340,20 @@ class UnitMeter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fraction = (units / limit).clamp(0.0, 1.0);
-    final bar = ClipRRect(
-      borderRadius: BorderRadius.circular(height),
-      child: SizedBox(
-        height: height,
+    // A groove pressed into the paper, filled to the units used.
+    final bar = Container(
+      height: height,
+      padding: const EdgeInsets.all(Gap.xs),
+      decoration: BoxDecoration(
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(height),
+        border: Border.all(color: AppColors.shade.withValues(alpha: 0.18), width: 0.5),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(height),
         child: Stack(children: [
           // Containers without a child fill the space they are given.
-          Container(color: const Color(0xFFE6E9ED)),
+          Container(color: AppColors.primarySoft),
           FractionallySizedBox(
             alignment: AlignmentDirectional.centerStart,
             widthFactor: fraction,
@@ -346,17 +365,17 @@ class UnitMeter extends StatelessWidget {
             widthFactor: (nearLimit / limit).clamp(0.0, 1.0),
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: Container(width: 2, color: Colors.white),
+              child: Container(width: 2, color: AppColors.surface),
             ),
           ),
         ]),
       ),
     );
     if (!showScale) return bar;
-    final scaleStyle = numberStyle(12, color: AppColors.inkSubtle, weight: FontWeight.w500);
+    final scaleStyle = numberStyle(12, color: AppColors.inkMuted, mono: true);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       bar,
-      const SizedBox(height: Gap.xs + 2),
+      const SizedBox(height: Gap.sm),
       Row(children: [
         Text('0', style: scaleStyle),
         const Spacer(),
@@ -430,7 +449,7 @@ class DemoBanner extends StatelessWidget {
       width: double.infinity,
       decoration: const BoxDecoration(
         color: AppColors.amberSoft,
-        border: Border(bottom: BorderSide(color: Color(0xFFF0DFB4))),
+        border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: Gap.page, vertical: Gap.sm),
       child: Row(children: [
@@ -484,7 +503,7 @@ class LanguageSwitch extends StatelessWidget {
       segments: const [
         ButtonSegment(
           value: AppLanguage.en,
-          label: Text('English', style: TextStyle(fontFamily: 'Roboto', fontSize: 15, fontWeight: FontWeight.w600)),
+          label: Text('English', style: TextStyle(fontFamily: 'GeneralSans', fontSize: 15, fontWeight: FontWeight.w600)),
         ),
         ButtonSegment(
           value: AppLanguage.ur,
@@ -517,7 +536,7 @@ class StepRow extends StatelessWidget {
           height: 26,
           alignment: Alignment.center,
           decoration: const BoxDecoration(color: AppColors.primarySoft, shape: BoxShape.circle),
-          child: Text('$number', style: numberStyle(13, color: AppColors.primaryDark, weight: FontWeight.w700)),
+          child: Text('$number', style: numberStyle(13, color: AppColors.primaryDark)),
         ),
         const SizedBox(width: Gap.md + 2),
         Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyLarge)),
