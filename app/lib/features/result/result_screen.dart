@@ -81,6 +81,7 @@ class _ResultScreenState extends State<ResultScreen> {
         final bill = state.bill;
         if (bill == null) {
           return Scaffold(
+            backgroundColor: AppColors.desk,
             appBar: AppBar(),
             body: state.loaded ? MessageView(icon: Icons.search_off_rounded, title: s.t('not_found')) : null,
           );
@@ -101,6 +102,7 @@ class _ResultScreenState extends State<ResultScreen> {
               );
 
         return Scaffold(
+          backgroundColor: AppColors.desk,
           appBar: AppBar(title: Text(state.connection?.nickname ?? s.t('app_name'))),
           body: ListView(
             padding: EdgeInsets.only(bottom: bottomPadding(context)),
@@ -113,13 +115,11 @@ class _ResultScreenState extends State<ResultScreen> {
                     _TtsTip(onClose: () => setState(() => _showTtsTip = false)),
                     const SizedBox(height: Gap.md),
                   ],
-                  _Summary(bill: bill),
-                  const SizedBox(height: Gap.sm + 2),
+                  _Statement(bill: bill),
+                  const SizedBox(height: Gap.lg),
                   _ListenAll(text: builder.build(bill.verdict, bill.findings)),
-                  if (_Charges.hasBreakdown(bill.data)) ...[
-                    SectionTitle(s.t('charges_title')),
-                    _Charges(data: bill.data),
-                  ],
+                  SectionTitle(s.t('meter_title', {'limit': formatNumber(repo.tariffConfig.protectedLimitUnits)})),
+                  _LimitCard(units: bill.data.units),
                   SectionTitle(s.t('findings_title')),
                   _Findings(findings: ExplanationBuilder.ordered(bill.findings), builder: builder),
                   if (forecast != null) ...[
@@ -177,131 +177,15 @@ class _ResultScreenState extends State<ResultScreen> {
   }
 }
 
-/// Verdict first, then the amount, key facts and the 200-unit meter.
-class _Summary extends StatelessWidget {
-  const _Summary({required this.bill});
+/// The bill as a paper statement: who and when with the verdict stamped
+/// beside it, the amount, the verdict in words, units and due date, then the
+/// charges the bill lists, ruled like a ledger down to the total.
+class _Statement extends StatelessWidget {
+  const _Statement({required this.bill});
 
   final Bill bill;
 
-  @override
-  Widget build(BuildContext context) {
-    final s = context.s;
-    final theme = Theme.of(context);
-    final builder = ExplanationBuilder(s);
-    final data = bill.data;
-    final config = context.read<BillRepository>().tariffConfig;
-    final limit = config.protectedLimitUnits;
-    final meter = UnitMeter(units: data.units, limit: limit, nearLimit: config.nearLimitUnits);
-    final heading = [formatMonth(data.billMonth, s), ?data.disco].join(' · ');
-    final left = limit - data.units;
-
-    return AppCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Expanded(child: Text(heading, style: theme.textTheme.bodySmall)),
-          VerdictPill(bill.verdict),
-        ]),
-        const SizedBox(height: Gap.md),
-        Semantics(
-          label: '${builder.verdictLabel(bill.verdict)}. ${builder.verdictSentence(bill.verdict)}',
-          excludeSemantics: true,
-          child: Text(builder.verdictSentence(bill.verdict), style: theme.textTheme.titleLarge),
-        ),
-        const SizedBox(height: Gap.lg),
-        Text(s.t(data.isCredit ? 'credit_due' : 'amount_due'), style: theme.textTheme.bodySmall),
-        const SizedBox(height: 2),
-        Text(
-          formatAmount(data.totalDue, s),
-          style: numberStyle(34, weight: FontWeight.w700, letterSpacing: -0.6, color: data.isCredit ? AppColors.greenInk : AppColors.ink),
-        ),
-        const SizedBox(height: Gap.lg),
-        const Divider(),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: Gap.md),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: _Fact(label: s.t('units_label'), value: formatNumber(data.units))),
-            if (data.dueDate != null)
-              Expanded(child: _Fact(label: s.t('due_date'), value: formatDate(data.dueDate!, s), end: true)),
-          ]),
-        ),
-        const Divider(),
-        const SizedBox(height: Gap.md),
-        Row(children: [
-          Expanded(
-            child: Text(
-              [
-                s.t('units_of_limit', {'units': formatNumber(data.units), 'limit': formatNumber(limit)}),
-                if (left > 0) s.t('units_left', {'left': formatNumber(left)}),
-              ].join(' · '),
-              style: theme.textTheme.titleSmall,
-            ),
-          ),
-          Icon(meter.tone.icon, color: meter.tone.color, size: 18),
-        ]),
-        const SizedBox(height: Gap.sm),
-        meter,
-      ]),
-    );
-  }
-}
-
-class _Fact extends StatelessWidget {
-  const _Fact({required this.label, required this.value, this.end = false});
-
-  final String label;
-  final String value;
-
-  /// Aligned to the end edge (the second of two facts).
-  final bool end;
-
-  @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: end ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
-          const SizedBox(height: 2),
-          Text(value, style: numberStyle(15.5)),
-        ],
-      );
-}
-
-/// Full-width "Listen to explanation" right under the summary, so people who
-/// prefer listening find it first.
-class _ListenAll extends StatelessWidget {
-  const _ListenAll({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final tts = context.read<TtsService>();
-    final s = context.s;
-    return ValueListenableBuilder<String?>(
-      valueListenable: tts.playing,
-      builder: (context, playing, _) {
-        final isPlaying = playing == 'all';
-        return FilledButton.tonalIcon(
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-          icon: Icon(isPlaying ? Icons.stop_circle_rounded : Icons.play_circle_rounded, size: 22),
-          label: Text(isPlaying ? s.t('stop') : s.t('listen_all')),
-          onPressed: () {
-            HapticFeedback.selectionClick();
-            tts.toggle('all', text);
-          },
-        );
-      },
-    );
-  }
-}
-
-/// Line items from the bill, adding up to the total. The info icon explains
-/// a line in plain words (from the glossary).
-class _Charges extends StatelessWidget {
-  const _Charges({required this.data});
-
-  final ExtractedBill data;
-
-  /// Worth showing only with the cost of electricity and at least one other
+  /// Worth listing only with the cost of electricity and at least one other
   /// line; a credit bill has no breakdown to explain.
   static bool hasBreakdown(ExtractedBill d) =>
       !d.isCredit && d.energyCharges != null && _lines(d).length > 1;
@@ -326,56 +210,100 @@ class _Charges extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.s;
     final theme = Theme.of(context);
+    final builder = ExplanationBuilder(s);
+    final data = bill.data;
+    final month = formatMonth(data.billMonth, s);
+
+    return AppCard(
+      padding: const EdgeInsets.fromLTRB(Gap.lg, Gap.xl, Gap.lg, Gap.sm),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // On a narrow phone the stamp drops under the heading instead of
+        // covering it.
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.start,
+          spacing: Gap.md,
+          runSpacing: Gap.md,
+          children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Text(data.disco ?? month, style: theme.textTheme.titleMedium),
+              if (data.disco != null) Text(s.t('bill_for', {'month': month}), style: theme.textTheme.bodySmall),
+            ]),
+            VerdictPill(bill.verdict),
+          ],
+        ),
+        const SizedBox(height: Gap.xl),
+        Text(s.t(data.isCredit ? 'credit_due' : 'amount_due'), style: theme.textTheme.bodySmall),
+        const SizedBox(height: Gap.xs),
+        Text(
+          formatAmount(data.totalDue, s),
+          style: numberStyle(42, letterSpacing: -1.6, color: data.isCredit ? AppColors.greenInk : AppColors.ink),
+        ),
+        const SizedBox(height: Gap.md),
+        Semantics(
+          label: '${builder.verdictLabel(bill.verdict)}. ${builder.verdictSentence(bill.verdict)}',
+          excludeSemantics: true,
+          child: Text(builder.verdictSentence(bill.verdict), style: theme.textTheme.bodyLarge),
+        ),
+        const SizedBox(height: Gap.lg),
+        const Divider(),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: Gap.md),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(child: _Fact(label: s.t('units_label'), value: formatNumber(data.units))),
+            if (data.dueDate != null) Expanded(child: _Fact(label: s.t('due_date'), value: formatDate(data.dueDate!, s))),
+          ]),
+        ),
+        if (hasBreakdown(data)) _charges(context, s, theme) else const SizedBox(height: Gap.sm),
+      ]),
+    );
+  }
+
+  Widget _charges(BuildContext context, AppStrings s, ThemeData theme) {
+    final data = bill.data;
     final lines = _lines(data);
     // Whatever the listed lines do not explain (rounding, other surcharges).
     final other = data.totalDue - lines.fold<double>(0, (sum, l) => sum + l.$2);
     final rows = [
-      for (final (key, amount, code) in lines)
-        (s.t(key, {'units': formatNumber(data.units)}), amount, code),
+      for (final (key, amount, code) in lines) (s.t(key, {'units': formatNumber(data.units)}), amount, code),
       if (other.abs() >= 1) (s.t('charge_other'), other, null),
     ];
-
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(children: [
-        for (final (i, (label, amount, code)) in rows.indexed) ...[
-          if (i > 0) const PanelDivider(),
-          // Same height with or without the info button, so amounts line up.
-          ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 56),
-            child: Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.xs, Gap.lg, Gap.xs),
+    final rule = BorderSide(color: AppColors.ink.withValues(alpha: 0.85), width: 1.5);
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Container(height: 0, decoration: BoxDecoration(border: Border(top: rule))),
+      for (final (i, (label, amount, code)) in rows.indexed) ...[
+        if (i > 0) const Divider(),
+        // Same height with or without the info button, so amounts line up.
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Row(children: [
+            Expanded(
               child: Row(children: [
-                Expanded(
-                  child: Row(children: [
-                    Flexible(child: Text(label, style: theme.textTheme.bodyLarge)),
-                    if (code != null)
-                      IconButton(
-                        tooltip: s.t('what_is_this'),
-                        iconSize: 18,
-                        color: AppColors.inkSubtle,
-                        icon: const Icon(Icons.info_outline_rounded),
-                        onPressed: () => _explain(context, code),
-                      ),
-                  ]),
-                ),
-                const SizedBox(width: Gap.md),
-                Text(formatAmount(amount, s), style: numberStyle(15.5)),
+                Flexible(child: Text(label, style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.ink))),
+                if (code != null)
+                  IconButton(
+                    tooltip: s.t('what_is_this'),
+                    iconSize: 17,
+                    color: AppColors.inkSubtle,
+                    icon: const Icon(Icons.info_outline_rounded),
+                    onPressed: () => _explain(context, code),
+                  ),
               ]),
             ),
-          ),
-        ],
-        Container(
-          decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.ink, width: 1.2))),
-          margin: const EdgeInsets.symmetric(horizontal: Gap.lg),
-          padding: const EdgeInsets.symmetric(vertical: Gap.md + 2),
-          child: Row(children: [
-            Expanded(child: Text(s.t('charge_total'), style: theme.textTheme.titleMedium)),
-            Text(formatAmount(data.totalDue, s), style: numberStyle(16.5, weight: FontWeight.w700)),
+            const SizedBox(width: Gap.md),
+            Text(formatAmount(amount, s), style: numberStyle(14, mono: true)),
           ]),
         ),
-      ]),
-    );
+      ],
+      Container(
+        decoration: BoxDecoration(border: Border(top: rule)),
+        padding: const EdgeInsets.symmetric(vertical: Gap.md),
+        child: Row(children: [
+          Expanded(child: Text(s.t('charge_total'), style: theme.textTheme.titleMedium)),
+          Text(formatAmount(data.totalDue, s), style: numberStyle(16, mono: true)),
+        ]),
+      ),
+    ]);
   }
 
   void _explain(BuildContext context, String code) {
@@ -402,6 +330,85 @@ class _Charges extends StatelessWidget {
   }
 }
 
+class _Fact extends StatelessWidget {
+  const _Fact({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: Gap.xs),
+          Text(value, style: numberStyle(14, mono: true)),
+        ],
+      );
+}
+
+/// "Listen to explanation" as the ink button right under the statement, so
+/// people who prefer listening find it first.
+class _ListenAll extends StatelessWidget {
+  const _ListenAll({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final tts = context.read<TtsService>();
+    final s = context.s;
+    return ValueListenableBuilder<String?>(
+      valueListenable: tts.playing,
+      builder: (context, playing, _) {
+        final isPlaying = playing == 'all';
+        return PrimaryButton(
+          icon: isPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded,
+          label: isPlaying ? s.t('stop') : s.t('listen_all'),
+          onPressed: () => tts.toggle('all', text),
+        );
+      },
+    );
+  }
+}
+
+/// Units used against the protected limit, as a groove, with the sentence
+/// that explains it.
+class _LimitCard extends StatelessWidget {
+  const _LimitCard({required this.units});
+
+  final int units;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    final theme = Theme.of(context);
+    final config = context.read<BillRepository>().tariffConfig;
+    final limit = config.protectedLimitUnits;
+    final text = ExplanationBuilder(s).meterText(units, limit);
+    final left = limit - units;
+    return AppCard(
+      padding: const EdgeInsetsDirectional.fromSTEB(Gap.lg, Gap.xs, Gap.xs, Gap.lg),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(children: [
+          Expanded(
+            child: Text(
+              s.t('units_of_limit', {'units': formatNumber(units), 'limit': formatNumber(limit)}),
+              style: theme.textTheme.titleSmall,
+            ),
+          ),
+          if (left > 0) Text(s.t('units_left', {'left': formatNumber(left)}), style: theme.textTheme.bodySmall),
+          PlayButton(id: 'meter', text: text),
+        ]),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(end: Gap.md),
+          child: UnitMeter(units: units, limit: limit, nearLimit: config.nearLimitUnits, height: 14, showScale: true),
+        ),
+      ]),
+    );
+  }
+}
+
 /// Findings as short titles that open to the full sentence. The most serious
 /// one starts open.
 class _Findings extends StatefulWidget {
@@ -423,15 +430,12 @@ class _FindingsState extends State<_Findings> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final builder = widget.builder;
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(children: [
-        for (final (i, f) in widget.findings.indexed) ...[
-          if (i > 0) const PanelDivider(indent: 50),
-          _finding(f, theme, builder),
-        ],
-      ]),
-    );
+    return Column(children: [
+      for (final (i, f) in widget.findings.indexed) ...[
+        if (i > 0) const SizedBox(height: Gap.sm),
+        AppCard(padding: EdgeInsets.zero, child: _finding(f, theme, builder)),
+      ],
+    ]);
   }
 
   Widget _finding(Finding f, ThemeData theme, ExplanationBuilder builder) {
@@ -452,7 +456,7 @@ class _FindingsState extends State<_Findings> {
               icon,
               const SizedBox(width: Gap.md + 2),
               Expanded(child: Text(builder.findingTitle(f), style: theme.textTheme.titleSmall)),
-              Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: AppColors.inkSubtle),
+              Icon(open ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: AppColors.inkMuted),
             ]),
           ),
         ),
@@ -464,7 +468,7 @@ class _FindingsState extends State<_Findings> {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(bottom: Gap.sm),
-                child: Text(text, style: theme.textTheme.bodyLarge),
+                child: Text(text, style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.ink)),
               ),
             ),
             PlayButton(id: f.ruleId, text: text),
@@ -542,7 +546,7 @@ class _ForecastResult extends StatelessWidget {
               const SizedBox(height: Gap.sm),
               Text(
                 '${formatAmount(forecast.amountLow!, s)} – ${formatAmount(forecast.amountHigh!, s)}',
-                style: numberStyle(24, weight: FontWeight.w700, letterSpacing: -0.3),
+                style: numberStyle(24, letterSpacing: -0.3),
               ),
             ],
             const SizedBox(height: Gap.xs),
