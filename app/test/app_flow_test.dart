@@ -251,7 +251,7 @@ void main() {
     await tester.tap(urduTitle);
     await tester.pumpAndSettle();
     expect(find.textContaining('اس مہینے آپ نے 186 یونٹ'), findsOneWidget);
-    expect(find.text('چارجز'), findsOneWidget);
+    expect(find.text('ستمبر 2026 کا بل'), findsOneWidget);
   });
 
   testWidgets('reference-number lookup form: validation, saved number, both languages', (tester) async {
