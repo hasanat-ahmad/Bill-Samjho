@@ -98,7 +98,7 @@
     "meter_title": "{limit} یونٹ کی حد",
     "findings_title": "ہم نے کیا دیکھا",
     "next_steps": "اگلے قدم",
-    "charges_title": "چارجز",
+    "bill_for": "{month} کا بل",
     "charge_energy": "بجلی کی قیمت ({units} یونٹ)",
     "charge_fixed": "فکسڈ چارجز",
     "charge_fpa": "فیول پرائس ایڈجسٹمنٹ (FPA)",
