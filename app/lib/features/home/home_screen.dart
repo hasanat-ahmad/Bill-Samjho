@@ -27,6 +27,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.s;
     return Scaffold(
+      backgroundColor: AppColors.desk,
       appBar: AppBar(
         titleSpacing: Gap.page,
         title: Row(children: [
@@ -133,40 +134,62 @@ class _ConnectionCard extends StatelessWidget {
     final bill = summary.latestBill;
     final connection = summary.connection;
     final config = context.read<BillRepository>().tariffConfig;
-    final subtitle = [
-      ?connection.disco,
-      if (bill != null) formatMonth(bill.data.billMonth, s),
-    ].join(' · ');
+    final left = config.protectedLimitUnits - (bill?.data.units ?? 0);
 
-    return AppCard(
-      onTap: () => context.push('/history/${connection.id}'),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Row(children: [
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(connection.nickname, style: theme.textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
-              if (subtitle.isNotEmpty) Text(subtitle, style: theme.textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+    // An index card: the company on a tab above the card.
+    return Padding(
+      padding: const EdgeInsets.only(top: Gap.xl),
+      child: Stack(clipBehavior: Clip.none, children: [
+        AppCard(
+          onTap: () => context.push('/history/${connection.id}'),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(connection.nickname, style: theme.textTheme.titleLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  if (bill != null) Text(formatMonth(bill.data.billMonth, s), style: theme.textTheme.bodySmall),
+                ]),
+              ),
+              if (bill != null) VerdictPill(bill.verdict) else const Icon(Icons.chevron_right_rounded, color: AppColors.inkMuted),
             ]),
+            if (bill == null) ...[
+              const SizedBox(height: Gap.md),
+              Text(s.t('no_bill_yet'), style: theme.textTheme.bodyMedium),
+            ] else ...[
+              const SizedBox(height: Gap.lg),
+              Text(formatAmount(bill.data.totalDue, s), style: numberStyle(32, letterSpacing: -1.2)),
+              const SizedBox(height: Gap.md),
+              UnitMeter(units: bill.data.units, limit: config.protectedLimitUnits, nearLimit: config.nearLimitUnits),
+              const SizedBox(height: Gap.sm),
+              Row(children: [
+                Expanded(
+                  child: Text(
+                    s.t('units_of_limit', {
+                      'units': formatNumber(bill.data.units),
+                      'limit': formatNumber(config.protectedLimitUnits),
+                    }),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+                if (left > 0) Text(s.t('units_left', {'left': formatNumber(left)}), style: theme.textTheme.bodySmall),
+              ]),
+            ],
+          ]),
+        ),
+        if (connection.disco != null)
+          PositionedDirectional(
+            top: -(Gap.xl - Gap.xs),
+            start: Gap.md,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: Gap.md, vertical: Gap.xs),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(Radii.xs)),
+                border: Border(top: Paper.edge.top, left: Paper.edge.top, right: Paper.edge.top),
+              ),
+              child: Text(connection.disco!, style: theme.textTheme.labelMedium?.copyWith(color: AppColors.inkMuted)),
+            ),
           ),
-          if (bill != null) VerdictPill(bill.verdict) else const Icon(Icons.chevron_right_rounded, color: AppColors.inkSubtle),
-        ]),
-        if (bill == null) ...[
-          const SizedBox(height: Gap.md),
-          Text(s.t('no_bill_yet'), style: theme.textTheme.bodyMedium),
-        ] else ...[
-          const SizedBox(height: Gap.lg),
-          Text(formatAmount(bill.data.totalDue, s), style: numberStyle(26, weight: FontWeight.w700, letterSpacing: -0.3)),
-          const SizedBox(height: Gap.md),
-          UnitMeter(units: bill.data.units, limit: config.protectedLimitUnits, nearLimit: config.nearLimitUnits),
-          const SizedBox(height: Gap.sm),
-          Text(
-            s.t('units_of_limit', {
-              'units': formatNumber(bill.data.units),
-              'limit': formatNumber(config.protectedLimitUnits),
-            }),
-            style: theme.textTheme.bodySmall,
-          ),
-        ],
       ]),
     );
   }
