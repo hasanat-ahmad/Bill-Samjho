@@ -54,3 +54,15 @@ flutter:
     - family: NotoNastaliqUrdu
       fonts:
         - asset: assets/fonts/NotoNastaliqUrdu.ttf
+    # Fetched by scripts/fetch_fonts.sh (licence: embed, do not share the files).
+    - family: GeneralSans
+      fonts:
+        - asset: assets/fonts/GeneralSans-Regular.otf
+          weight: 400
+        - asset: assets/fonts/GeneralSans-Medium.otf
+          weight: 500
+        - asset: assets/fonts/GeneralSans-Semibold.otf
+          weight: 600
+    - family: GeistMono
+      fonts:
+        - asset: assets/fonts/GeistMono.ttf
