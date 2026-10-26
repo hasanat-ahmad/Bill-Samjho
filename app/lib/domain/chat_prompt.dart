@@ -35,6 +35,16 @@ String buildChatPrompt({
     'Late payment surcharge': d.lateSurcharge,
   }..removeWhere((_, v) => v == null);
 
+  String isoDay(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  // Same date the next-bill estimate counts days from.
+  final readOn = Forecaster.readingDateOf(d);
+  final readingDate = d.readingDate != null
+      ? formatDate(d.readingDate!, s)
+      : readOn == null
+          ? 'not shown'
+          : 'not printed on the bill; about ${formatDate(isoDay(readOn), s)} (estimated as 25 days before the due date)';
+
   return '''
 You are the helper inside "Bill Samjho", an app that explains Pakistani household electricity bills to ordinary people, many with little schooling.
 
@@ -53,6 +63,8 @@ THE USER'S BILL${nickname == null ? '' : ' (meter: $nickname)'}:
 - ${d.isCredit ? 'Credit (nothing to pay): ${rs(d.totalDue.abs())}' : 'Amount payable within due date: ${rs(d.totalDue)}'}
 - Due date: ${d.dueDate == null ? 'not shown' : formatDate(d.dueDate!, s)}
 - Meter readings: ${d.previousReading ?? '?'} to ${d.presentReading ?? '?'}
+- Meter reading date (the day the meter was read for this bill): $readingDate
+- Today's date: ${formatDate(isoDay(Forecaster.now()), s)}
 - Tariff: ${d.tariffCategory ?? 'not shown'}
 - Category printed on bill: ${switch (d.protectedConsumer) { true => 'Protected', false => 'Unprotected', null => 'not shown' }}
 ${charges.entries.map((e) => '- ${e.key}: ${rs(e.value!)}').join('\n')}

@@ -84,6 +84,24 @@ void main() {
       expect(p, contains('FPA (Fuel Price Adjustment)'));
     });
 
+    test('gives the meter reading date: printed, or estimated like the next-bill estimate', () {
+      Forecaster.now = () => DateTime(2026, 10, 24);
+      addTearDown(() => Forecaster.now = DateTime.now);
+      // This bill shows no reading date: 25 days before the 14 October due date.
+      final estimated = buildChatPrompt(s: en, bill: bill, config: config);
+      expect(estimated, contains('Meter reading date (the day the meter was read for this bill): not printed on the bill; about 19 September 2026'));
+      expect(estimated, contains("Today's date: 24 October 2026"));
+
+      final printed = ExtractedBill(
+        billMonth: '2026-09', units: 106, totalDue: 4367, dueDate: '2026-10-14', readingDate: '2026-09-17');
+      final withDate = buildChatPrompt(
+        s: en,
+        bill: Bill(id: 'b', connectionId: 'c', data: printed, verdict: result.verdict, findings: result.findings, imagePath: '', createdAt: DateTime(2026)),
+        config: config,
+      );
+      expect(withDate, contains('Meter reading date (the day the meter was read for this bill): 17 September 2026'));
+    });
+
     test('asks for Urdu when the app is in Urdu', () {
       final p = buildChatPrompt(s: ur, bill: bill, config: config);
       expect(p, contains('Reply in Urdu'));

@@ -204,7 +204,10 @@ class Forecaster {
     return (estimate, spread, soFar, days);
   }
 
-  /// The bill's meter reading date, or about 25 days before the due date.
+  /// The bill's meter reading date, or about 25 days before the due date
+  /// (an estimate when the bill does not print it).
+  static DateTime? readingDateOf(ExtractedBill bill) => _readingDate(bill);
+
   static DateTime? _readingDate(ExtractedBill bill) {
     final raw = bill.readingDate ?? bill.dueDate;
     if (raw == null || !isIsoDate(raw)) return null;
