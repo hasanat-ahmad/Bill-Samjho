@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 import '../core/i18n.dart';
+import 'speech_text.dart';
 
 /// Text-to-speech in the app language (FR-10). [playing] holds the ID of the
 /// text being spoken so each play button can show its own state.
@@ -12,6 +13,12 @@ import '../core/i18n.dart';
 /// broken (e.g. Google's neural Urdu voice failing with error -4), so this
 /// picks voices explicitly and falls back to the next voice until one
 /// actually starts speaking.
+///
+/// Offline only: Google's engine lists each voice twice, "-local" (made on
+/// the phone, a neural voice on current versions) and "-network" (made on
+/// Google's servers). Only the local ones are used, so nothing is sent, and
+/// one voice per language is kept so it never changes mid-explanation. Text
+/// is rewritten for speech first ([SpeechText]).
 class TtsService {
   final FlutterTts _tts = FlutterTts();
   final ValueNotifier<String?> playing = ValueNotifier(null);
@@ -98,11 +105,15 @@ class TtsService {
       voiceAvailable = await _setLegacyLanguage(language);
     }
     debugPrint('TTS ${language.name}: ${voices.length} voices, available=$voiceAvailable');
-    await _safely(() => _tts.setSpeechRate(_slow ? 0.32 : 0.47));
+    await _safely(() => _tts.setSpeechRate(_slow ? _rateSlow : _rateNormal));
   }
 
-  /// Installed voices for [language], ordered: preferred locale first
-  /// (ur-PK before ur-IN), then offline before network.
+  /// Android's normal speaking speed is 0.5; slower sounds unnatural.
+  static const _rateNormal = 0.5;
+  static const _rateSlow = 0.36;
+
+  /// Offline voices for [language]: preferred locale first (ur-PK before
+  /// ur-IN), then by name, so the same voice is chosen every time.
   Future<List<Map<String, String>>> _voicesFor(AppLanguage language) async {
     try {
       final raw = await _tts.getVoices;
@@ -116,14 +127,23 @@ class TtsService {
         if (name.isEmpty || !wanted.contains(locale.toLowerCase())) continue;
         voices.add({'name': name, 'locale': locale, 'network': '${v['network_required'] ?? '0'}'});
       }
-      int rank(Map<String, String> v) =>
-          wanted.indexOf(v['locale']!.toLowerCase()) * 2 + (v['network'] == '1' ? 1 : 0);
-      voices.sort((a, b) => rank(a).compareTo(rank(b)));
-      return voices;
+      return offlineVoices(voices, wanted);
     } catch (e) {
       debugPrint('TTS voice list failed: $e');
       return const [];
     }
+  }
+
+  /// Keeps only voices that work without internet ("-local", not "-network",
+  /// and not the "...-language" alias for one of them), in a fixed order.
+  @visibleForTesting
+  static List<Map<String, String>> offlineVoices(List<Map<String, String>> voices, List<String> locales) {
+    final out = voices
+        .where((v) => v['network'] != '1' && !v['name']!.endsWith('-network') && !v['name']!.endsWith('-language'))
+        .toList();
+    int rank(Map<String, String> v) => locales.indexOf(v['locale']!.toLowerCase());
+    out.sort((a, b) => rank(a) != rank(b) ? rank(a).compareTo(rank(b)) : a['name']!.compareTo(b['name']!));
+    return out;
   }
 
   Future<bool> _setLegacyLanguage(AppLanguage language) async {
@@ -143,13 +163,14 @@ class TtsService {
 
   Future<void> setSlow(bool slow) {
     _slow = slow;
-    return _safely(() => _tts.setSpeechRate(slow ? 0.32 : 0.47));
+    return _safely(() => _tts.setSpeechRate(slow ? _rateSlow : _rateNormal));
   }
 
   /// Speaks [text], trying the next voice whenever one fails to start.
   Future<void> speak(String id, String text) async {
     playing.value = id;
     await _ready;
+    text = SpeechText.prepare(text, _language);
     final attempts = _voices.isEmpty ? 1 : _voices.length;
     for (var i = 0; i < attempts; i++) {
       if (playing.value != id) return; // stopped or replaced meanwhile
