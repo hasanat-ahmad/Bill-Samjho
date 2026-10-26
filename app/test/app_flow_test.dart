@@ -348,4 +348,45 @@ void main() {
     expect(find.text('What is FPA?'), findsOneWidget); // now as the user's message
     expect(find.text('FPA is a fuel cost adjustment.'), findsOneWidget);
   });
+
+  testWidgets('appliance calculator: an AC adds units, costs more, and warns past the limit', (tester) async {
+    await tester.runAsync(() async {
+      await store.setSetting(SettingKeys.onboardingDone, true);
+      final c = await repo.addConnection('Home');
+      await repo.analyseAndSave(connectionId: c.id, data: await MockApiService().extractBill(Uint8List(0), ''), jpeg: _jpeg);
+    });
+    await pumpApp(tester);
+    await tester.tap(find.text('Home'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('September 2026'), 300);
+    await tester.tap(find.text('September 2026'));
+    await tester.pumpAndSettle();
+
+    final page = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(find.text('What does an appliance cost?'), 300, scrollable: page);
+    await tester.ensureVisible(find.text('What does an appliance cost?'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('What does an appliance cost?'));
+    await tester.pumpAndSettle();
+    expect(find.text('Appliance calculator'), findsOneWidget);
+    expect(find.text('Add an appliance to see how much it adds to your bill.'), findsOneWidget);
+
+    await tester.tap(find.text('Add appliance'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Regular AC (1.5 ton)'), 200, scrollable: find.byType(Scrollable).last);
+    await tester.tap(find.text('Regular AC (1.5 ton)'));
+    await tester.pumpAndSettle();
+    // 1500 W × 6 h × 30 days = 270 units; the sample bill's 186 becomes 456.
+    expect(find.text('about 270 units'), findsOneWidget);
+    expect(find.textContaining('Your bill would be about Rs'), findsOneWidget);
+    expect(find.textContaining('This takes you to 456 units, over the 200-unit limit'), findsOneWidget);
+
+    // Fewer hours: 5 h a day is 225 units.
+    await tester.scrollUntilVisible(find.text('Hours a day'), 200, scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.byTooltip('Less').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Less').last);
+    await tester.pumpAndSettle();
+    expect(find.text('about 225 units'), findsOneWidget);
+  });
 }

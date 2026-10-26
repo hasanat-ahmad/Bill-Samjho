@@ -139,6 +139,13 @@ class _ResultScreenState extends State<ResultScreen> {
                             subtitle: s.t('forecast_intro'),
                             onTap: () => _estimate(bill),
                           ),
+                        PanelTile(
+                          icon: Icons.electrical_services_outlined,
+                          iconColor: AppColors.primary,
+                          title: s.t('appliances_entry_title'),
+                          subtitle: s.t('appliances_entry_body'),
+                          onTap: () => context.push('/appliances/${bill.id}'),
+                        ),
                         if (canChat)
                           PanelTile(
                             icon: Icons.forum_outlined,

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,6 +8,7 @@ import '../data/local_store.dart';
 import '../data/models/extracted_bill.dart';
 import '../domain/chat_prompt.dart';
 import '../domain/forecaster.dart';
+import '../features/appliances/appliances_screen.dart';
 import '../features/chat/chat_cubit.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/glossary/glossary_screen.dart';
@@ -93,6 +95,14 @@ GoRouter buildRouter(LocalStore store) => GoRouter(
               create: (_) => ChatCubit(chat.create!(prompt)),
               child: ChatScreen(billMonth: bill.data.billMonth),
             );
+          },
+        ),
+        GoRoute(
+          path: '/appliances/:billId',
+          builder: (context, state) {
+            final bill = context.read<BillRepository>().bill(state.pathParameters['billId']!);
+            if (bill == null) return const Scaffold(body: SizedBox.shrink());
+            return AppliancesScreen(bill: bill);
           },
         ),
         GoRoute(
