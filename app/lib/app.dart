@@ -14,6 +14,7 @@ import 'data/local_store.dart';
 import 'features/home/home_cubit.dart';
 import 'features/settings/settings_cubit.dart';
 import 'services/dictation_service.dart';
+import 'services/reminder_service.dart';
 import 'services/scan_service.dart';
 import 'services/tts_service.dart';
 
@@ -27,6 +28,7 @@ class BillSamjhoApp extends StatefulWidget {
     required this.scanner,
     this.chat = const ChatAvailability(null),
     this.dictation,
+    this.reminders,
     this.appVersion = '',
   });
 
@@ -39,6 +41,9 @@ class BillSamjhoApp extends StatefulWidget {
 
   /// Voice typing in the chat; null hides the mic.
   final Dictation? dictation;
+
+  /// Bill reminders; null in tests.
+  final ReminderService? reminders;
   final String appVersion;
 
   @override
@@ -54,12 +59,24 @@ class _BillSamjhoAppState extends State<BillSamjhoApp> {
   void initState() {
     super.initState();
     widget.tts.failures.addListener(_onVoiceFailure);
+    widget.reminders?.tapped.addListener(_onReminderTapped);
+    // A reminder that launched the app may have arrived before this widget.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onReminderTapped());
   }
 
   @override
   void dispose() {
     widget.tts.failures.removeListener(_onVoiceFailure);
+    widget.reminders?.tapped.removeListener(_onReminderTapped);
     super.dispose();
+  }
+
+  /// Opens the screen a tapped reminder points to (only the app's own routes).
+  void _onReminderTapped() {
+    final route = widget.reminders?.tapped.value;
+    if (route == null || !mounted) return;
+    widget.reminders!.tapped.value = null;
+    if (route.startsWith('/result/') || route.startsWith('/lookup/')) _router.push(route);
   }
 
   /// No voice on the phone could speak: say so instead of staying silent.
@@ -88,11 +105,14 @@ class _BillSamjhoAppState extends State<BillSamjhoApp> {
         RepositoryProvider.value(value: widget.scanner),
         RepositoryProvider.value(value: widget.chat),
         RepositoryProvider<Dictation?>.value(value: widget.dictation),
+        RepositoryProvider<ReminderService?>.value(value: widget.reminders),
         RepositoryProvider<AppVersion>.value(value: AppVersion(widget.appVersion)),
       ],
       child: MultiBlocProvider(
         providers: [
-          BlocProvider(create: (_) => SettingsCubit(widget.store, widget.repo, widget.tts)),
+          BlocProvider(
+            create: (_) => SettingsCubit(widget.store, widget.repo, widget.tts, onLanguageChanged: widget.reminders?.sync),
+          ),
           BlocProvider(create: (_) => HomeCubit(widget.repo)),
         ],
         child: BlocBuilder<SettingsCubit, AppSettings>(

@@ -22,6 +22,7 @@ import 'data/bill_repository.dart';
 import 'data/local_store.dart';
 import 'data/tariff_config_service.dart';
 import 'services/dictation_service.dart';
+import 'services/reminder_service.dart';
 import 'services/scan_service.dart';
 import 'services/tts_service.dart';
 
@@ -74,6 +75,14 @@ Future<void> main() async {
     slow: store.setting<bool>(SettingKeys.slowVoice) ?? false,
   ));
 
+  // Strings for reminder texts follow the language chosen in the app.
+  final reminders = ReminderService(
+    store: store,
+    repo: repo,
+    strings: () => translations[AppLanguage.fromCode(store.setting<String>(SettingKeys.language))]!,
+  );
+  unawaited(reminders.init());
+
   final version = await PackageInfo.fromPlatform().then((p) => p.version, onError: (_) => '');
 
   runApp(BillSamjhoApp(
@@ -84,6 +93,7 @@ Future<void> main() async {
     scanner: ScanService(),
     chat: ChatAvailability((prompt) => FirebaseBillChat(prompt, firebase), firebase: firebase),
     dictation: SpeechDictation(),
+    reminders: reminders,
     appVersion: version,
   ));
 }

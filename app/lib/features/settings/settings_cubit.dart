@@ -21,7 +21,7 @@ class AppSettings {
 
 /// App-wide preferences (FR-17), language, and one-time flags.
 class SettingsCubit extends Cubit<AppSettings> {
-  SettingsCubit(this._store, this._repo, this._tts)
+  SettingsCubit(this._store, this._repo, this._tts, {this.onLanguageChanged})
       : super(AppSettings(
           language: AppLanguage.fromCode(_store.setting<String>(SettingKeys.language)),
           slowVoice: _store.setting<bool>(SettingKeys.slowVoice) ?? false,
@@ -32,11 +32,15 @@ class SettingsCubit extends Cubit<AppSettings> {
   final BillRepository _repo;
   final TtsService _tts;
 
+  /// Called after the language changes (reminders re-word themselves).
+  final void Function()? onLanguageChanged;
+
   Future<void> setLanguage(AppLanguage language) async {
     if (language == state.language) return;
     emit(state.copyWith(language: language));
     await _store.setSetting(SettingKeys.language, language.name);
     await _tts.setLanguage(language);
+    onLanguageChanged?.call();
   }
 
   Future<void> setSlowVoice(bool slow) async {
