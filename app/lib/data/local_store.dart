@@ -103,6 +103,8 @@ class SettingKeys {
   static const slowVoice = 'slow_voice';
   static const largeText = 'large_text';
   static const ttsTipShown = 'tts_tip_shown';
+  static const reminders = 'reminders';
+  static const notificationsAsked = 'notifications_asked';
 }
 
 /// The Hive encryption key, generated once and kept in the Android Keystore.
