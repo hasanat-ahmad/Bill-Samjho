@@ -7,6 +7,7 @@ import '../../core/i18n.dart';
 import '../../core/theme.dart';
 import '../../core/widgets.dart';
 import '../../data/bill_repository.dart';
+import '../../services/reminder_service.dart';
 import 'settings_cubit.dart';
 
 /// S10: language, voice speed, text size, delete all data (FR-17).
@@ -60,6 +61,10 @@ class SettingsScreen extends StatelessWidget {
                 selected: {settings.largeText},
                 onSelectionChanged: (v) => cubit.setLargeText(v.first),
               ),
+              if (context.read<ReminderService?>() case final reminders?) ...[
+                SectionTitle(s.t('reminders_title')),
+                _RemindersTile(reminders),
+              ],
               SectionTitle(s.t('privacy_section')),
               AppCard(
                 padding: EdgeInsets.zero,
@@ -100,6 +105,44 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           );
+        },
+      ),
+    );
+  }
+}
+
+/// Bill reminders on or off. Turning them on asks for notification permission.
+class _RemindersTile extends StatefulWidget {
+  const _RemindersTile(this.reminders);
+
+  final ReminderService reminders;
+
+  @override
+  State<_RemindersTile> createState() => _RemindersTileState();
+}
+
+class _RemindersTileState extends State<_RemindersTile> {
+  late bool _on = widget.reminders.enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.s;
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: PanelTile(
+        icon: Icons.notifications_none_rounded,
+        title: s.t('reminders_switch'),
+        subtitle: s.t('reminders_body'),
+        trailing: Switch(
+          value: _on,
+          onChanged: (on) {
+            setState(() => _on = on);
+            widget.reminders.setEnabled(on);
+          },
+        ),
+        onTap: () {
+          setState(() => _on = !_on);
+          widget.reminders.setEnabled(_on);
         },
       ),
     );
