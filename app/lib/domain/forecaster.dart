@@ -148,6 +148,15 @@ class Forecaster {
     );
   }
 
+  /// Rough total of a bill like [bill] for [units] units: the same taxes and
+  /// charges, and the higher rate above the protected limit. Null when it
+  /// cannot be worked out (unknown month, credit bill).
+  double? costAt(ExtractedBill bill, List<Bill> past, int units) {
+    final current = monthIndex(bill.billMonth);
+    if (current == null) return null;
+    return _amount(bill, _unitsByMonth(bill, past, current), current, units);
+  }
+
   Map<int, int> _unitsByMonth(ExtractedBill bill, List<Bill> past, int current) {
     final result = <int, int>{};
     for (final h in bill.history) {
