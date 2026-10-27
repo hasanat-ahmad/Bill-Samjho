@@ -51,4 +51,12 @@ void main() {
     expect(FirebaseAiApiService.isSetupError('PERMISSION_DENIED'), isTrue);
     expect(FirebaseAiApiService.isSetupError('The model is overloaded. Please try again later.'), isFalse);
   });
+
+  // QA D-02: a confidence written as text is read like the server reads it,
+  // not mistaken for "AI busy" (which retried every model).
+  test('numbers written as text: read like the server; NaN is unreadable', () {
+    expect(FirebaseAiApiService.parseModelOutput(_out({'confidence': '0.9'})).confidence, 0.9);
+    expect(() => FirebaseAiApiService.parseModelOutput(_out({'confidence': 'NaN'})), _apiError(ApiError.unreadable));
+    expect(FirebaseAiApiService.parseModelOutput(_out({'present_reading': '355'})).presentReading, 355);
+  });
 }
