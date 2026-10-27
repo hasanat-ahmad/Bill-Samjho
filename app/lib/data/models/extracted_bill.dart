@@ -100,7 +100,8 @@ class ExtractedBill {
     if (units == null || units < 0 || units > maxUnits) throw const FormatException('units');
     // Negative = credit bill ("CR"): nothing to pay.
     if (total == null || !total.isFinite || total.abs() > maxAmount) throw const FormatException('total_due');
-    if (month == null || monthIndex(month) == null) throw const FormatException('bill_month');
+    final monthNumber = month == null ? null : monthIndex(month);
+    if (monthNumber == null) throw const FormatException('bill_month');
 
     double? amount(String key) {
       final v = _double(json[key]);
@@ -118,15 +119,22 @@ class ExtractedBill {
     for (final row in (json['history'] is List ? json['history'] as List : const [])) {
       if (row is! Map) continue;
       final h = HistoryEntry.fromJson(Map<String, dynamic>.from(row));
-      if (h == null || monthIndex(h.month) == null || h.units < 0 || h.units > maxUnits) continue;
-      history.add(h);
+      final i = h == null ? null : monthIndex(h.month);
+      if (h == null || i == null || h.units < 0 || h.units > maxUnits) continue;
+      final amount = h.amount;
+      history.add(HistoryEntry(
+        month: monthKey(i),
+        units: h.units,
+        amount: amount != null && amount.abs() <= maxAmount ? amount : null,
+      ));
       if (history.length == maxHistoryRows) break;
     }
 
     return ExtractedBill(
       disco: _clean(json['disco'], 24),
       referenceNo: _clean(json['reference_no'], 40),
-      billMonth: month,
+      // Stored as "2026-09": bills are sorted and matched by this text.
+      billMonth: monthKey(monthNumber),
       previousReading: reading('previous_reading'),
       presentReading: reading('present_reading'),
       units: units,
@@ -143,8 +151,8 @@ class ExtractedBill {
       arrears: amount('arrears'),
       totalDue: total,
       lateSurcharge: amount('late_surcharge'),
-      dueDate: dueDate != null && isIsoDate(dueDate) ? dueDate : null,
-      readingDate: readingDate != null && isIsoDate(readingDate) ? readingDate : null,
+      dueDate: dueDate == null ? null : isoDate(dueDate),
+      readingDate: readingDate == null ? null : isoDate(readingDate),
       history: history,
       confidence: (_double(json['confidence']) ?? 0).clamp(0.0, 1.0),
     );
