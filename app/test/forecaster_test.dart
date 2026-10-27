@@ -112,6 +112,22 @@ void main() {
     expect(forecaster.meterProblem(bill(units: 106, present: 355), 400, today: day), MeterProblem.noDate);
   });
 
+  // Boundary value analysis: 1 and 60 days are allowed; same reading is 0 units.
+  test('meter reading boundaries: days 0/1, 60/61; reading below/at the bill', () {
+    final b = bill(units: 106, present: 355, readingDate: '2026-09-19');
+    final read = DateTime(2026, 9, 19);
+    expect(forecaster.meterProblem(b, 400, today: read), MeterProblem.tooSoon); // day 0
+    expect(forecaster.meterProblem(b, 400, today: read.add(const Duration(days: 1))), isNull);
+    expect(forecaster.meterProblem(b, 400, today: read.add(const Duration(days: 60))), isNull);
+    expect(forecaster.meterProblem(b, 400, today: read.add(const Duration(days: 61))), MeterProblem.tooOld);
+    final day = DateTime(2026, 10, 9);
+    expect(forecaster.meterProblem(b, 354, today: day), MeterProblem.belowBill);
+    expect(forecaster.meterProblem(b, 355, today: day), isNull);
+    final none = forecaster.forecast(b, const [], meterReading: 355, today: day)!;
+    expect(none.units, 0);
+    expect(none.amount, isNull); // nothing to scale from, not Rs 0 or a crash
+  });
+
   test('a reading the bill did not show can be added before estimating', () {
     final b = bill(units: 106, readingDate: '2026-09-19').copyWith(presentReading: 355);
     final f = forecaster.forecast(b, const [], meterReading: 455, today: DateTime(2026, 10, 9))!;
