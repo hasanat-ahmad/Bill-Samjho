@@ -251,10 +251,10 @@ String? _str(Object? v) {
   return s.isEmpty ? null : s;
 }
 
+/// Null for anything that is not a finite number ("NaN", "Infinity").
 double? _double(Object? v) {
-  if (v is num) return v.toDouble();
-  if (v is String) return double.tryParse(v.replaceAll(',', '').trim());
-  return null;
+  final d = v is num ? v.toDouble() : v is String ? double.tryParse(v.replaceAll(',', '').trim()) : null;
+  return d != null && d.isFinite ? d : null;
 }
 
 int? _int(Object? v) {
