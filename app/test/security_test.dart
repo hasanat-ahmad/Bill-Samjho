@@ -78,6 +78,22 @@ void main() {
     test('history that is not a list is ignored', () {
       expect(ExtractedBill.fromUntrusted(_bill({'history': 'oops'})).history, isEmpty);
     });
+
+    // QA D-01: dates and months are stored in the one form the rest of the app reads.
+    test('dates and months are normalised; impossible dates are dropped', () {
+      final b = ExtractedBill.fromUntrusted(_bill({
+        'bill_month': '2026-9',
+        'due_date': '2026-10-5',
+        'reading_date': '2026-02-31',
+        'history': [
+          {'month': '2026-8', 'units': 178},
+        ],
+      }));
+      expect(b.billMonth, '2026-09');
+      expect(b.dueDate, '2026-10-05');
+      expect(b.readingDate, isNull); // 31 February
+      expect(b.history.single.month, '2026-08');
+    });
   });
 
   group('remote tariff config is range-checked', () {
