@@ -27,13 +27,20 @@ int? monthIndex(String month) {
 /// Inverse of [monthIndex].
 String monthKey(int index) => '${index ~/ 12}-${(index % 12 + 1).toString().padLeft(2, '0')}';
 
-/// True for a real calendar date in "YYYY-MM-DD" form.
-bool isIsoDate(String date) {
+/// "2026-10-5" → "2026-10-05"; null unless a real calendar date (no
+/// 31 February).
+String? isoDate(String date) {
   final m = _datePattern.firstMatch(date.trim());
-  if (m == null) return false;
-  final mo = int.parse(m.group(2)!), d = int.parse(m.group(3)!);
-  return mo >= 1 && mo <= 12 && d >= 1 && d <= 31;
+  if (m == null) return null;
+  final y = int.parse(m.group(1)!), mo = int.parse(m.group(2)!), d = int.parse(m.group(3)!);
+  final day = DateTime.utc(y, mo, d);
+  if (day.month != mo || day.day != d) return null;
+  return '${m.group(1)}-${mo.toString().padLeft(2, '0')}-${d.toString().padLeft(2, '0')}';
 }
+
+/// True for a real calendar date written exactly "YYYY-MM-DD", the only
+/// form `DateTime.parse` reads.
+bool isIsoDate(String date) => isoDate(date) == date;
 
 /// "2026-09" → "September 2026" / "ستمبر 2026". Falls back to the raw text.
 String formatMonth(String month, AppStrings s) {
