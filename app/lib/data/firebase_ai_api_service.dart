@@ -117,16 +117,16 @@ class FirebaseAiApiService implements ApiService {
     if (raw['is_electricity_bill'] == false) throw const ApiException(ApiError.notABill);
 
     final json = Map<String, dynamic>.from(raw);
-    var confidence = (json['confidence'] as num?)?.toDouble() ?? 0;
+    var confidence = _number(json['confidence']) ?? 0;
     if (confidence < AppConstants.minConfidence) throw const ApiException(ApiError.unreadable);
 
     // Readings that do not add up (and no meter multiplier explains it) mean
     // the photo was hard to read: ask the user to check the numbers closely.
-    final prev = (json['previous_reading'] as num?)?.round();
-    final pres = (json['present_reading'] as num?)?.round();
-    final units = (json['units'] as num?)?.round();
+    final prev = _number(json['previous_reading'])?.round();
+    final pres = _number(json['present_reading'])?.round();
+    final units = _number(json['units'])?.round();
     if (prev != null && pres != null && units != null && pres - prev != units) {
-      final mf = (json['meter_multiplier'] as num?)?.toDouble();
+      final mf = _number(json['meter_multiplier']);
       if (mf == null || ((pres - prev) * mf - units).abs() > 1) {
         confidence = confidence < AppConstants.minConfidence ? confidence : AppConstants.minConfidence;
       }
@@ -138,6 +138,13 @@ class FirebaseAiApiService implements ApiService {
     } on FormatException {
       throw const ApiException(ApiError.unreadable);
     }
+  }
+
+  /// A number, or one written as text ("4,367"), like toNumber in
+  /// functions/src/validate.ts; null when not a finite number.
+  static double? _number(Object? v) {
+    final d = v is num ? v.toDouble() : v is String ? double.tryParse(v.replaceAll(',', '').trim()) : null;
+    return d != null && d.isFinite ? d : null;
   }
 
   /// Same as functions/src/schema.ts SYSTEM_PROMPT.
