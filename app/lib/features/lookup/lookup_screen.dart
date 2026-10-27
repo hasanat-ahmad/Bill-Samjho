@@ -83,17 +83,23 @@ class _LookupScreenState extends State<LookupScreen> {
       ..setBackgroundColor(Colors.white)
       // PITC's bill is laid out for a desktop screen: allow pinch-zoom.
       ..enableZoom(true)
+      // The web view can still report after the user has left this screen.
       ..setNavigationDelegate(NavigationDelegate(
-        onNavigationRequest: (request) =>
-            PitcSite.isAllowed(Uri.parse(request.url)) ? NavigationDecision.navigate : NavigationDecision.prevent,
-        onPageStarted: (_) => setState(() {
-          _pageLoading = true;
-          _billVisible = false;
-          _pageError = null;
-        }),
+        onNavigationRequest: (request) {
+          final uri = Uri.tryParse(request.url);
+          return uri != null && PitcSite.isAllowed(uri) ? NavigationDecision.navigate : NavigationDecision.prevent;
+        },
+        onPageStarted: (_) {
+          if (!mounted) return;
+          setState(() {
+            _pageLoading = true;
+            _billVisible = false;
+            _pageError = null;
+          });
+        },
         onPageFinished: (_) => _afterPageLoad(),
         onWebResourceError: (error) {
-          if (error.isForMainFrame ?? true) {
+          if (mounted && (error.isForMainFrame ?? true)) {
             setState(() {
               _pageLoading = false;
               _pageError = s.t('page_error');
