@@ -72,4 +72,16 @@ void main() {
     expect(plan[0].title, contains('آخری تاریخ'));
     expect(plan[0].body, contains('4,367 روپے'));
   });
+
+  // QA D-01: one bill with a date DateTime.parse cannot read must not stop
+  // the reminders of every other meter.
+  test('a bill with an unreadable due date is skipped, others still planned', () {
+    final plan = planner.plan(
+      connections: [meter('a'), meter('c')],
+      latestBill: (id) => id == 'a' ? bill('bad', due: '2026-10-5') : bill('b'),
+      s: en,
+      now: DateTime(2026, 10, 1),
+    );
+    expect(plan.map((r) => r.route), ['/result/b', '/lookup/c?latest=1']);
+  });
 }
