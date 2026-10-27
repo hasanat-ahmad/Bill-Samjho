@@ -1,0 +1,59 @@
+# Quality checks on every push and pull request. Needs no secrets: tests use
+# the bundled tariff config, in-memory storage and fake AI/scanner services.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Flutter app (analyze, test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.41.4
+          channel: stable
+          cache: true
+      # General Sans may not be committed (licence); fetch it like a developer would.
+      - name: Fetch fonts
+        run: scripts/fetch_fonts.sh
+      - name: Install packages
+        working-directory: app
+        run: flutter pub get
+      - name: Analyze
+        working-directory: app
+        run: flutter analyze
+      - name: Test
+        working-directory: app
+        run: flutter test
+
+  functions:
+    name: Cloud Functions (build, test, audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci
+      - run: npm test
+      # Fails on high or critical advisories in packages that are deployed.
+      - run: npm audit --omit=dev --audit-level=high
