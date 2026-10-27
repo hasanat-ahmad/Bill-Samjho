@@ -94,6 +94,23 @@ void main() {
       expect(b.readingDate, isNull); // 31 February
       expect(b.history.single.month, '2026-08');
     });
+
+    // QA D-02: "NaN" and "Infinity" are not numbers a bill can contain.
+    test('non-finite numbers are rejected, never trusted', () {
+      expect(() => ExtractedBill.fromUntrusted(_bill({'units': 'Infinity'})), throwsFormatException);
+      expect(() => ExtractedBill.fromUntrusted(_bill({'total_due': 'NaN'})), throwsFormatException);
+      final b = ExtractedBill.fromUntrusted(_bill({
+        'confidence': 'NaN',
+        'gst': double.infinity,
+        'history': [
+          {'month': '2026-08', 'units': 178, 'amount': double.infinity},
+          {'month': '2026-07', 'units': 212, 'amount': 1e15},
+        ],
+      }));
+      expect(b.confidence, 0); // not 1.0
+      expect(b.gst, isNull);
+      expect(b.history.map((h) => h.amount), [null, null]);
+    });
   });
 
   group('remote tariff config is range-checked', () {
